@@ -542,14 +542,21 @@ See also the variable `org-agenda-tags-todo-honor-ignore-options'."
   :type 'boolean)
 
 (defcustom org-agenda-todo-ignore-deadlines nil
-  "Non-nil means, don't show near deadline entries in the global todo list.
-Near means closer than `org-deadline-warning-days' days.
+  "Non-nil means, don't show any deadline entries in the global todo list.
+You can also chose to hide only near or far deadlines by setting the
+variable as 'near or 'far symbols, respectively. Near means closer
+than `org-deadline-warning-days' days and far are the ones which
+further than `org-deadline-warning-days' from today.
 The idea behind this is that such items will appear in the agenda anyway.
 See also `org-agenda-todo-ignore-with-date'.
 See also the variable `org-agenda-tags-todo-honor-ignore-options'."
   :group 'org-agenda-skip
   :group 'org-agenda-todo-list
-  :type 'boolean)
+  :type '(choice
+	  (const :tag "Near" 'near)
+	  (const :tag "Far" 'far)
+	  (const :tag "All" t)
+	  (const :tag "None" nil)))
 
 (defcustom org-agenda-tags-todo-honor-ignore-options nil
   "Non-nil means, honor todo-list ...ignore options also in tags-todo search.
@@ -4070,9 +4077,14 @@ the documentation of `org-diary'."
 	       (re-search-forward org-ts-regexp end t))
 	  (and org-agenda-todo-ignore-scheduled
 	       (re-search-forward org-scheduled-time-regexp end t))
-	  (and org-agenda-todo-ignore-deadlines
-	       (re-search-forward org-deadline-time-regexp end t)
-	       (org-deadline-close (match-string 1)))))))
+	  (and (re-search-forward org-deadline-time-regexp end t)
+	       (let ((deadline-string (match-string 1)))
+	         (cond
+		  ((eq org-agenda-todo-ignore-deadlines 'near)
+		   (org-deadline-close deadline-string))
+		  ((eq org-agenda-todo-ignore-deadlines 'far)
+		   (not (org-deadline-close deadline-string)))
+		  (org-agenda-todo-ignore-deadlines t))))))))
 
 (defconst org-agenda-no-heading-message
   "No heading for this item in buffer or region.")
