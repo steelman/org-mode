@@ -573,6 +573,11 @@ near    Don't show near deadline entries.  A deadline is near when it is
 far     Don't show far deadline entries.  This is useful if you don't want
         to use the todo list to figure out what to do now.
 
+past    Don't show entries with a deadline timestamp for today or in the past.
+
+future  Don't show entries with a deadline timestamp in the future, not even
+        when they become `near' ones. Use it with caution.
+
 all     Ignore all TODO entries that do have a deadline.       
 
 t       Same as `near', for backward compatibility.
@@ -4127,6 +4132,10 @@ the documentation of `org-diary'."
 		((memq org-agenda-todo-ignore-deadlines '(t all)) t)
 		((eq org-agenda-todo-ignore-deadlines 'far)
 		 (not (org-deadline-close (match-string 1))))
+		((eq org-agenda-todo-ignore-deadlines 'future)
+		 (> (org-days-to-time (match-string 1)) 0))
+		((eq org-agenda-todo-ignore-deadlines 'past)
+		 (<= (org-days-to-time (match-string 1)) 0))
 		(t (org-deadline-close (match-string 1)))))))))
 
 (defconst org-agenda-no-heading-message
