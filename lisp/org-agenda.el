@@ -3727,9 +3727,25 @@ timestamp     Check if there is a timestamp (also deadline or scheduled)
 nottimestamp  Check if there is no timestamp (also deadline or scheduled)
 regexp        Check if regexp matches
 notregexp     Check if regexp does not match.
+todo          Check if TODO keyword matches
+nottodo       Check if TODO keyword does not match
 
 The regexp is taken from the conditions list, it must come right after
 the `regexp' or `notregexp' element.
+
+`todo' and `nottodo' accept as an argument a list of todo
+keywords, which may include ""*"" to match any todo keyword.
+
+    (org-agenda-skip-entry-if 'todo '(""TODO"" ""WAITING""))
+
+would skip all entries with ""TODO"" or ""WAITING"" keywords.
+
+Instead of a list a keyword class may be given
+
+    (org-agenda-skip-entry-if 'nottodo 'done)
+
+would skip entries that haven't been marked with any of ""DONE""
+keywords. Possible classes are: `todo', `done', `any'.
 
 If any of these conditions is met, this function returns the end point of
 the entity, causing the search to continue from there.  This is a function
@@ -3760,8 +3776,41 @@ that can be put into `org-agenda-skip-function' for the duration of a command."
 	   (re-search-forward (nth 1 m) end t))
       (and (setq m (memq 'notregexp conditions))
 	   (stringp (nth 1 m))
-	   (not (re-search-forward (nth 1 m) end t))))
+	   (not (re-search-forward (nth 1 m) end t)))
+      (and (or
+	    (setq m (memq 'todo conditions))
+	    (setq m (memq 'nottodo conditions)))
+	   (org-agenda-skip-if-todo m end)))
      end)))
+
+(defun org-agenda-skip-if-todo (args end)
+  "Helper function for org-agenda-skip-if, do not use it directly."
+  (let ((kw (car args))
+	(arg (cadr args))
+	todo-wds todo-re)
+    (setq todo-wds
+	  (org-uniquify
+	   (cond
+	    ((listp arg)   ;; list of keywords
+	     (if (member "*" arg)
+		 (mapcar 'substring-no-properties org-todo-keywords-1)
+	       arg))
+	    ((symbolp arg) ;; keyword class name
+	     (cond
+	      ((eq arg 'todo)
+	       (org-delete-all org-done-keywords
+			       (mapcar 'substring-no-properties
+				       org-todo-keywords-1)))
+	      ((eq arg 'done) org-done-keywords)
+	      ((eq arg 'any)
+	       (mapcar 'substring-no-properties org-todo-keywords-1)))))))
+    (setq todo-re
+	  (concat "^\\*+[ \t]+\\<\\("
+		  (mapconcat 'identity todo-wds  "\\|")
+		  "\\)\\>"))
+    (if (eq kw 'todo)
+	(re-search-forward todo-re end t)
+      (not (re-search-forward todo-re end t)))))
 
 ;;;###autoload
 (defun org-agenda-list-stuck-projects (&rest ignore)
