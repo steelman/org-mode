@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -64,7 +64,7 @@ which see."
 (defcustom org-clock-out-when-done t
   "When non-nil, clock will be stopped when the clocked entry is marked DONE.
 DONE here means any DONE-like state.
-A nil value means, clock will keep running until stopped explicitly with
+A nil value means clock will keep running until stopped explicitly with
 `C-c C-x C-o', or until the clock is started in a different item.
 Instead of t, this can also be a list of TODO states that should trigger
 clocking out."
@@ -76,7 +76,7 @@ clocking out."
 		  (string :tag "TODO keyword"))))
 
 (defcustom org-clock-out-remove-zero-time-clocks nil
-  "Non-nil means, remove the clock line when the resulting time is zero."
+  "Non-nil means remove the clock line when the resulting time is zero."
   :group 'org-clock
   :type 'boolean)
 
@@ -112,7 +112,7 @@ state to switch it to."
   :type 'integer)
 
 (defcustom org-clock-goto-may-find-recent-task t
-  "Non-nil means, `org-clock-goto' can go to recent task if no active clock."
+  "Non-nil means `org-clock-goto' can go to recent task if no active clock."
   :group 'org-clock
   :type 'boolean)
 
@@ -199,6 +199,17 @@ auto     Automatically, either `all', or `repeat' for repeating tasks"
 	  (const :tag "Since last repeat" repeat)
 	  (const :tag "All task time" all)
 	  (const :tag "Automatically, `all' or since `repeat'" auto)))
+
+(defcustom org-task-overrun-text nil
+  "The extra modeline text that should indicate that the clock is overrun.
+The can be nil to indicate that instead of adding text, the clock time
+should get a different face (`org-mode-line-clock-overrun').
+When this is a string, it is prepended to the clock string as an indication,
+also using the face `org-mode-line-clock-overrun'."
+  :group 'org-clock
+  :type '(choice
+	  (const :tag "Just mark the time string" nil)
+	  (string :tag "Text to prepend")))
 
 (defcustom org-show-notification-handler nil
   "Function or program to send notification with.
@@ -388,6 +399,11 @@ pointing to it."
 	(insert (format "[%c] %-15s %s\n" i cat task))
 	(cons i marker)))))
 
+(defvar org-task-overrun nil
+  "Internal flag indicating if the clock has overrun the planned time.")
+(defvar org-clock-update-period 60
+  "Number of seconds between mode line clock string updates.")
+
 (defun org-clock-get-clock-string ()
   "Form a clock-string, that will be show in the mode line.
 If an effort estimate was defined for current item, use
@@ -396,29 +412,50 @@ If not, show simply the clocked time like 01:50."
   (let* ((clocked-time (org-clock-get-clocked-time))
 	 (h (floor clocked-time 60))
 	 (m (- clocked-time (* 60 h))))
-    (if (and org-clock-effort)
-	(let* ((effort-in-minutes (org-hh:mm-string-to-minutes org-clock-effort))
+    (if org-clock-effort
+	(let* ((effort-in-minutes
+		(org-hh:mm-string-to-minutes org-clock-effort))
 	       (effort-h (floor effort-in-minutes 60))
-	       (effort-m (- effort-in-minutes (* effort-h 60))))
-	  (format (concat "-[" org-time-clocksum-format "/" org-time-clocksum-format " (%s)]")
-		  h m effort-h effort-m  org-clock-heading))
-      (format (concat "-[" org-time-clocksum-format " (%s)]")
-	      h m org-clock-heading))))
+	       (effort-m (- effort-in-minutes (* effort-h 60)))
+	       (work-done-str
+		(org-propertize
+		 (format org-time-clocksum-format h m)
+		 'face (if (and org-task-overrun (not org-task-overrun-text))
+			   'org-mode-line-clock-overrun 'org-mode-line-clock)))
+	       (effort-str (format org-time-clocksum-format effort-h effort-m))
+	       (clockstr (org-propertize
+			  (concat  "[%s/" effort-str
+				   "] (" org-clock-heading ")")
+			  'face 'org-mode-line-clock)))
+	  (format clockstr work-done-str))
+      (org-propertize (format
+		       (concat "[" org-time-clocksum-format " (%s)]")
+		       h m org-clock-heading)
+		      'face 'org-mode-line-clock))))
 
 (defun org-clock-update-mode-line ()
+  (if org-clock-effort
+      (org-clock-notify-once-if-expired)
+    (setq org-task-overrun nil))
   (setq org-mode-line-string
 	(org-propertize
 	 (let ((clock-string (org-clock-get-clock-string))
 	       (help-text "Org-mode clock is running.\nmouse-1 shows a menu\nmouse-2 will jump to task"))
 	   (if (and (> org-clock-string-limit 0)
 		    (> (length clock-string) org-clock-string-limit))
-	       (org-propertize (substring clock-string 0 org-clock-string-limit)
-			       'help-echo (concat help-text ": " org-clock-heading))
+	       (org-propertize
+		(substring clock-string 0 org-clock-string-limit)
+		'help-echo (concat help-text ": " org-clock-heading))
 	     (org-propertize clock-string 'help-echo help-text)))
 	 'local-map org-clock-mode-line-map
 	 'mouse-face (if (featurep 'xemacs) 'highlight 'mode-line-highlight)
-	 'face 'org-mode-line-clock))
-  (if org-clock-effort (org-clock-notify-once-if-expired))
+	 ))
+  (if (and org-task-overrun org-task-overrun-text)
+      (setq org-mode-line-string
+	    (concat (org-propertize
+		     org-task-overrun-text
+		     'face 'org-mode-line-clock-overrun) org-mode-line-string)))
+ 
   (force-mode-line-update))
 
 (defun org-clock-get-clocked-time ()
@@ -473,7 +510,10 @@ Notification is shown only once."
   (when (marker-buffer org-clock-marker)
     (let ((effort-in-minutes (org-hh:mm-string-to-minutes org-clock-effort))
 	  (clocked-time (org-clock-get-clocked-time)))
-      (if (>= clocked-time effort-in-minutes)
+      (if (setq org-task-overrun 
+		(if (or (null effort-in-minutes) (zerop effort-in-minutes))
+		    nil
+		  (>= clocked-time effort-in-minutes)))
 	  (unless org-clock-notification-was-shown
 	    (setq org-clock-notification-was-shown t)
 	    (org-notify
@@ -924,7 +964,9 @@ the clocking selection, associated with the letter `d'."
 			      (functionp org-clock-heading-function))
 			 (funcall org-clock-heading-function))
 			((looking-at org-complex-heading-regexp)
-			 (match-string 4))
+			 (replace-regexp-in-string
+			  "\\[\\[.*?\\]\\[\\(.*?\\)\\]\\]" "\\1"
+			  (match-string 4)))
 			(t "???")))
 	    (setq org-clock-heading (org-propertize org-clock-heading
 						    'face nil))
@@ -989,7 +1031,9 @@ the clocking selection, associated with the letter `d'."
 	      (cancel-timer org-clock-mode-line-timer)
 	      (setq org-clock-mode-line-timer nil))
 	    (setq org-clock-mode-line-timer
-		  (run-with-timer 60 60 'org-clock-update-mode-line))
+		  (run-with-timer org-clock-update-period
+				  org-clock-update-period
+				  'org-clock-update-mode-line))
 	    (when org-clock-idle-timer
 	      (cancel-timer org-clock-idle-timer)
 	      (setq org-clock-idle-timer nil))

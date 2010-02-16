@@ -4,7 +4,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -67,13 +67,13 @@ it may be prettier to customize the org-indent face."
   :type 'character)
 
 (defcustom org-indent-mode-turns-off-org-adapt-indentation t
-  "Non-nil means, turning on org-indent-mode turns off indentation adaptation.
+  "Non-nil means turning on `org-indent-mode' turns off indentation adaptation.
 For details see the variable `org-adapt-indentation'."
   :group 'org-indent
   :type 'boolean)
 
 (defcustom org-indent-mode-turns-on-hiding-stars t
-  "Non-nil means, turning on org-indent-mode turns on `org-hide-leading-stars'."
+  "Non-nil means turning on `org-indent-mode' turns on `org-hide-leading-stars'."
   :group 'org-indent
   :type 'boolean)
 

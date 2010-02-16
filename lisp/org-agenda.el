@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -88,7 +88,7 @@ only needed when the text to be killed contains more than N non-white lines."
 	  (integer :tag "When more than N lines")))
 
 (defcustom org-agenda-compact-blocks nil
-  "Non-nil means, make the block agenda more compact.
+  "Non-nil means make the block agenda more compact.
 This is done by leaving out unnecessary lines."
   :group 'org-agenda
   :type 'boolean)
@@ -108,7 +108,7 @@ If it is a character, it will be repeated to fill the window width."
  :group 'org-agenda)
 
 (defcustom org-agenda-with-colors t
-  "Non-nil means, use colors in agenda views."
+  "Non-nil means use colors in agenda views."
   :group 'org-agenda-export
   :type 'boolean)
 
@@ -149,7 +149,7 @@ variable `org-agenda-entry-text-maxlines'."
   :type 'integer)
 
 (defcustom org-agenda-add-entry-text-descriptive-links t
-  "Non-nil means, export org-links as descriptive links in agenda added text.
+  "Non-nil means export org-links as descriptive links in agenda added text.
 This variable applies to the text added to the agenda when
 `org-agenda-add-entry-text-maxlines' is larger than 0.
 When this variable nil, the URL will (also) be shown."
@@ -499,20 +499,20 @@ this one will be used."
   :group 'org-agenda)
 
 (defvar org-agenda-archives-mode nil
-  "Non-nil means, the agenda will include archived items.
+  "Non-nil means the agenda will include archived items.
 If this is the symbol `trees', trees in the selected agenda scope
 that are marked with the ARCHIVE tag will be included anyway.  When this is
 t, also all archive files associated with the current selection of agenda
 files will be included.")
 
 (defcustom org-agenda-skip-comment-trees t
-  "Non-nil means, skip trees that start with the COMMENT keyword.
+  "Non-nil means skip trees that start with the COMMENT keyword.
 When nil, these trees are also scanned by agenda commands."
   :group 'org-agenda-skip
   :type 'boolean)
 
 (defcustom org-agenda-todo-list-sublevels t
-  "Non-nil means, check also the sublevels of a TODO entry for TODO entries.
+  "Non-nil means check also the sublevels of a TODO entry for TODO entries.
 When nil, the sublevels of a TODO entry are not checked, resulting in
 potentially much shorter TODO lists."
   :group 'org-agenda-skip
@@ -520,7 +520,7 @@ potentially much shorter TODO lists."
   :type 'boolean)
 
 (defcustom org-agenda-todo-ignore-with-date nil
-  "Non-nil means, don't show entries with a date in the global todo list.
+  "Non-nil means don't show entries with a date in the global todo list.
 You can use this if you prefer to mark mere appointments with a TODO keyword,
 but don't want them to show up in the TODO list.
 When this is set, it also covers deadlines and scheduled items, the settings
@@ -532,34 +532,65 @@ See also the variable `org-agenda-tags-todo-honor-ignore-options'."
   :type 'boolean)
 
 (defcustom org-agenda-todo-ignore-scheduled nil
-  "Non-nil means, don't show scheduled entries in the global todo list.
-The idea behind this is that by scheduling it, you have already taken care
-of this item.
-See also `org-agenda-todo-ignore-with-date'.
-See also the variable `org-agenda-tags-todo-honor-ignore-options'."
-  :group 'org-agenda-skip
-  :group 'org-agenda-todo-list
-  :type 'boolean)
+  "Non-nil means, ignore some scheduled TODO items when making TODO list.
+This applies when creating the global todo list.
+Valid values are:
 
-(defcustom org-agenda-todo-ignore-deadlines nil
-  "Non-nil means, don't show any deadline entries in the global todo list.
-You can also chose to hide only near or far deadlines by setting the
-variable as 'near or 'far symbols, respectively. Near means closer
-than `org-deadline-warning-days' days and far are the ones which
-further than `org-deadline-warning-days' from today.
-The idea behind this is that such items will appear in the agenda anyway.
+past     Don't show entries scheduled today or in the past.
+
+future   Don't show entries scheduled in the future.
+         The idea behind this is that by scheduling it, you don't want to
+         think about it until the scheduled date.
+
+all      Don't show any scheduled entries in the global todo list.
+         The idea behind this is that by scheduling it, you have already
+         \"taken care\" of this item.
+
+t        Same as `all', for backward compatibility.
+
 See also `org-agenda-todo-ignore-with-date'.
-See also the variable `org-agenda-tags-todo-honor-ignore-options'."
+See also the variable `org-agenda-tags-todo-honor-ignore-options' if you want
+to make his option also apply to the tags-todo list."
   :group 'org-agenda-skip
   :group 'org-agenda-todo-list
   :type '(choice
-	  (const :tag "Near" 'near)
-	  (const :tag "Far" 'far)
-	  (const :tag "All" t)
-	  (const :tag "None" nil)))
+	  (const :tag "Ignore future-scheduled todos" future)
+	  (const :tag "Ignore past- or present-scheduled todos" past)
+	  (const :tag "Ignore all scheduled todos" all)
+	  (const :tag "Ignore all scheduled todos (compatibility)" t)
+	  (const :tag "Show scheduled todos" nil)))
+
+(defcustom org-agenda-todo-ignore-deadlines nil
+  "Non-nil means ignore some deadlined TODO items when making TODO list.
+
+This applie when creating the global todo list.
+Valid values are:
+
+near    Don't show near deadline entries.  A deadline is near when it is
+        closer than `org-deadline-warning-days' days.  The idea behind this
+        is that such items will appear in the agenda anyway.
+
+far     Don't show far deadline entries.  This is useful if you don't want
+        to use the todo list to figure out what to do now.
+
+all     Ignore all TODO entries that do have a deadline.       
+
+t       Same as `near', for backward compatibility.
+
+See also `org-agenda-todo-ignore-with-date'.
+See also the variable `org-agenda-tags-todo-honor-ignore-options' if you want
+to make his option also apply to the tags-todo list."
+  :group 'org-agenda-skip
+  :group 'org-agenda-todo-list
+  :type '(choice
+	  (const :tag "Ignore near deadlines" near)
+	  (const :tag "Ignore near deadlines (compatibility)" t)
+	  (const :tag "Ignore far deadlines" far)
+	  (const :tag "Ignore all TODOs with a deadlines" all)
+	  (const :tag "Show all TODOs, even if they have a deadline" nil)))
 
 (defcustom org-agenda-tags-todo-honor-ignore-options nil
-  "Non-nil means, honor todo-list ...ignore options also in tags-todo search.
+  "Non-nil means honor todo-list ...ignore options also in tags-todo search.
 The variables
    `org-agenda-todo-ignore-with-date',
    `org-agenda-todo-ignore-scheduled'
@@ -624,7 +655,7 @@ entry, the rest of the entry will not be searched."
   :type 'boolean)
 
 (defcustom org-agenda-dim-blocked-tasks t
-  "Non-nil means, dim blocked tasks in the agenda display.
+  "Non-nil means dim blocked tasks in the agenda display.
 This causes some overhead during agenda construction, but if you
 have turned on `org-enforce-todo-dependencies',
 `org-enforce-todo-checkbox-dependencies', or any other blocking
@@ -646,7 +677,7 @@ will only be dimmed."
 	  (const :tag "Make invisible" invisible)))
 
 (defcustom org-timeline-show-empty-dates 3
-  "Non-nil means, `org-timeline' also shows dates without an entry.
+  "Non-nil means `org-timeline' also shows dates without an entry.
 When nil, only the days which actually have entries are shown.
 When t, all days between the first and the last date are shown.
 When an integer, show also empty dates, but if there is a gap of more than
@@ -668,7 +699,7 @@ N days, just insert a special line indicating the size of the gap."
   :type 'hook)
 
 (defcustom org-agenda-mouse-1-follows-link nil
-  "Non-nil means, mouse-1 on a link will follow the link in the agenda.
+  "Non-nil means mouse-1 on a link will follow the link in the agenda.
 A longer mouse click will still set point.  Does not work on XEmacs.
 Needs to be set before org.el is loaded."
   :group 'org-agenda-startup
@@ -680,7 +711,7 @@ Needs to be set before org.el is loaded."
   :type 'boolean)
 
 (defcustom org-agenda-show-outline-path t
-  "Non-il means, show outline path in echo area after line motion."
+  "Non-nil means show outline path in echo area after line motion."
   :group 'org-agenda-startup
   :type 'boolean)
 
@@ -714,7 +745,7 @@ have been removed when this is called, as will any matches for regular
 expressions listed in `org-agenda-entry-text-exclude-regexps'.")
 
 (defvar org-agenda-include-inactive-timestamps nil
-  "Non-nil means, include inactive time stamps in agenda and timeline.")
+  "Non-nil means include inactive time stamps in agenda and timeline.")
 
 (defgroup org-agenda-windows nil
   "Options concerning the windows used by the Agenda in Org Mode."
@@ -747,7 +778,7 @@ It only matters if `org-agenda-window-setup' is `reorganize-frame'."
   :type '(cons (number :tag "Minimum") (number :tag "Maximum")))
 
 (defcustom org-agenda-restore-windows-after-quit nil
-  "Non-nil means, restore window configuration open exiting agenda.
+  "Non-nil means restore window configuration open exiting agenda.
 Before the window configuration is changed for displaying the agenda,
 the current status is recorded.  When the agenda is exited with
 `q' or `x' and this option is set, the old state is restored.  If
@@ -764,7 +795,7 @@ Custom commands can set this variable in the options section."
   :type 'integer)
 
 (defcustom org-agenda-start-on-weekday 1
-  "Non-nil means, start the overview always on the specified weekday.
+  "Non-nil means start the overview always on the specified weekday.
 0 denotes Sunday, 1 denotes Monday etc.
 When nil, always start on the current day.
 Custom commands can set this variable in the options section."
@@ -773,7 +804,7 @@ Custom commands can set this variable in the options section."
 		 (integer :tag "Weekday No.")))
 
 (defcustom org-agenda-show-all-dates t
-  "Non-nil means, `org-agenda' shows every day in the selected range.
+  "Non-nil means `org-agenda' shows every day in the selected range.
 When nil, only the days which actually have entries are shown."
   :group 'org-agenda-daily/weekly
   :type 'boolean)
@@ -812,6 +843,12 @@ This function makes sure that dates are aligned for easy reading."
     (format "%-10s %2d %s %4d%s"
 	    dayname day monthname year weekstring)))
 
+(defcustom org-agenda-time-leading-zero nil 
+  "Non-nil means use leading zero for military times in agenda.
+For example, 9:30am would become 09:30 rather than  9:30."
+  :group 'org-agenda-daily/weekly
+  :type 'boolean)
+ 
 (defcustom org-agenda-weekend-days '(6 0)
   "Which days are weekend?
 These days get the special face `org-agenda-date-weekend' in the agenda
@@ -841,7 +878,7 @@ This option is deprecated, it is better to define a block agenda instead."
   :type 'boolean)
 
 (defcustom org-agenda-repeating-timestamp-show-all t
-  "Non-nil means, show all occurrences of a repeating stamp in the agenda.
+  "Non-nil means show all occurrences of a repeating stamp in the agenda.
 When nil, only one occurrence is shown, either today or the
 nearest into the future."
   :group 'org-agenda-daily/weekly
@@ -868,7 +905,7 @@ the agenda to display all available LOG items temporarily."
   :type '(set :greedy t (const closed) (const clock) (const state)))
 
 (defcustom org-agenda-log-mode-add-notes t
-  "Non-nil means, add first line of notes to log entries in agenda views.
+  "Non-nil means add first line of notes to log entries in agenda views.
 If a log item like a state change or a clock entry is associated with
 notes, the first line of these notes will be added to the entry in the
 agenda display."
@@ -899,7 +936,7 @@ current display in the agenda."
   :type 'plist)
 
 (defcustom org-agenda-search-view-always-boolean nil
-  "Non-nil means, the search string is interpreted as individual parts.
+  "Non-nil means the search string is interpreted as individual parts.
 
 The search string for search view can either be interpreted as a phrase,
 or as a list of snippets that define a boolean search for a number of
@@ -942,7 +979,7 @@ When nil, they may also match part of a word."
   :group 'org-agenda)
 
 (defcustom org-agenda-search-headline-for-time t
-  "Non-nil means, search headline for a time-of-day.
+  "Non-nil means search headline for a time-of-day.
 If the headline contains a time-of-day in one format or another, it will
 be used to sort the entry into the time sequence of items for a day.
 Some people have time stamps in the headline that refer to the creation
@@ -953,7 +990,7 @@ for a time."
   :type 'boolean)
 
 (defcustom org-agenda-use-time-grid t
-  "Non-nil means, show a time grid in the agenda schedule.
+  "Non-nil means show a time grid in the agenda schedule.
 A time grid is a set of lines for specific times (like every two hours between
 8:00 and 20:00).  The items scheduled for a day at specific times are
 sorted in between these lines.
@@ -1070,7 +1107,7 @@ part of an agenda sorting strategy."
   :type 'symbol)
 
 (defcustom org-sort-agenda-notime-is-late t
-  "Non-nil means, items without time are considered late.
+  "Non-nil means items without time are considered late.
 This is only relevant for sorting.  When t, items which have no explicit
 time like 15:30 will be considered as 99:01, i.e. later than any items which
 do have a time.  When nil, the default time is before 0:00.  You can use this
@@ -1080,7 +1117,7 @@ agenda entries."
   :type 'boolean)
 
 (defcustom org-sort-agenda-noeffort-is-high t
-  "Non-nil means, items without effort estimate are sorted as high effort.
+  "Non-nil means items without effort estimate are sorted as high effort.
 This also applies when filtering an agenda view with respect to the
 < or > effort operator.  Then, tasks with no effort defined will be treated
 as tasks with high effort.
@@ -1219,7 +1256,7 @@ is (was)."
 		  (function))))
 
 (defcustom org-agenda-remove-times-when-in-prefix t
-  "Non-nil means, remove duplicate time specifications in agenda items.
+  "Non-nil means remove duplicate time specifications in agenda items.
 When the format `org-agenda-prefix-format' contains a `%t' specifier, a
 time-of-day specification in a headline or diary entry is extracted and
 placed into the prefix.  If this option is non-nil, the original specification
@@ -1246,7 +1283,7 @@ When non-nil, this must be the number of minutes, e.g. 60 for one hour."
 	  (const :tag "No default duration")))
 
 (defcustom org-agenda-show-inherited-tags t
-  "Non-nil means, show inherited tags in each agenda line."
+  "Non-nil means show inherited tags in each agenda line."
   :group 'org-agenda-line-format
   :type 'boolean)
 
@@ -1261,7 +1298,7 @@ Nil means don't hide any tags."
 	  (string :tag "Regexp   ")))
 
 (defcustom org-agenda-remove-tags nil
-  "Non-nil means, remove the tags from the headline copy in the agenda.
+  "Non-nil means remove the tags from the headline copy in the agenda.
 When this is the symbol `prefix', only remove tags when
 `org-agenda-prefix-format' contains a `%T' specifier."
   :group 'org-agenda-line-format
@@ -1286,7 +1323,7 @@ it means that the tags should be flushright to that column.  For example,
     (defvaralias 'org-agenda-align-tags-to-column 'org-agenda-tags-column))
 
 (defcustom org-agenda-fontify-priorities 'cookies
-  "Non-nil means, highlight low and high priorities in agenda.
+  "Non-nil means highlight low and high priorities in agenda.
 When t, the highest priority entries are bold, lowest priority italic.
 However, settings in org-priority-faces will overrule these faces.
 When this variable is the symbol `cookies', only fontify the
@@ -1311,12 +1348,12 @@ or a list like `(:background \"Red\")'."
   :group 'org-agenda)
 
 (defcustom org-agenda-columns-show-summaries t
-  "Non-nil means, show summaries for columns displayed in the agenda view."
+  "Non-nil means show summaries for columns displayed in the agenda view."
   :group 'org-agenda-column-view
   :type 'boolean)
 
 (defcustom org-agenda-columns-remove-prefix-from-item t
-  "Non-nil means, remove the prefix from a headline for agenda column view.
+  "Non-nil means remove the prefix from a headline for agenda column view.
 The special ITEM field in the columns format contains the current line, with
 all information shown in other columns (like the TODO state or a tag).
 When this variable is non-nil, also the agenda prefix will be removed from
@@ -1326,7 +1363,7 @@ headline can be shown in the limited width of the field."
   :type 'boolean)
 
 (defcustom org-agenda-columns-compute-summary-properties t
-  "Non-nil means, recompute all summary properties before column view.
+  "Non-nil means recompute all summary properties before column view.
 When column view in the agenda is listing properties that have a summary
 operator, it can go to all relevant buffers and recompute the summaries
 there.  This can mean overhead for the agenda column view, but is necessary
@@ -1337,7 +1374,7 @@ computations are current."
   :type 'boolean)
 
 (defcustom org-agenda-columns-add-appointments-to-effort-sum nil
-  "Non-nil means, the duration of an appointment will add to day effort.
+  "Non-nil means the duration of an appointment will add to day effort.
 The property to which appointment durations will be added is the one given
 in the option `org-effort-property'.  If an appointment does not have
 an end time, `org-agenda-default-appointment-duration' will be used.  If that
@@ -1719,7 +1756,7 @@ The following commands are available:
 ;;; Agenda undo
 
 (defvar org-agenda-allow-remote-undo t
-  "Non-nil means, allow remote undo from the agenda buffer.")
+  "Non-nil means allow remote undo from the agenda buffer.")
 (defvar org-agenda-undo-list nil
   "List of undoable operations in the agenda since last refresh.")
 (defvar org-agenda-undo-has-started-in nil
@@ -4066,8 +4103,9 @@ the documentation of `org-diary'."
     (nreverse ee)))
 
 ;;;###autoload
-(defun org-agenda-check-for-timestamp-as-reason-to-ignore-todo-item (&optional end)
-  "Do we have a reason to ignore this todo entry because it has a time stamp?"
+(defun org-agenda-check-for-timestamp-as-reason-to-ignore-todo-item
+  (&optional end)
+  "Do we have a reason to ignore this TODO entry because it has a time stamp?"
   (when (or org-agenda-todo-ignore-with-date
 	    org-agenda-todo-ignore-scheduled
 	    org-agenda-todo-ignore-deadlines)
@@ -4076,15 +4114,20 @@ the documentation of `org-diary'."
       (or (and org-agenda-todo-ignore-with-date
 	       (re-search-forward org-ts-regexp end t))
 	  (and org-agenda-todo-ignore-scheduled
-	       (re-search-forward org-scheduled-time-regexp end t))
-	  (and (re-search-forward org-deadline-time-regexp end t)
-	       (let ((deadline-string (match-string 1)))
-	         (cond
-		  ((eq org-agenda-todo-ignore-deadlines 'near)
-		   (org-deadline-close deadline-string))
-		  ((eq org-agenda-todo-ignore-deadlines 'far)
-		   (not (org-deadline-close deadline-string)))
-		  (org-agenda-todo-ignore-deadlines t))))))))
+	       (re-search-forward org-scheduled-time-regexp end t)
+	       (cond
+		((eq org-agenda-todo-ignore-scheduled 'future)
+		 (> (org-days-to-time (match-string 1)) 0))
+		((eq org-agenda-todo-ignore-scheduled 'past)
+		 (<= (org-days-to-time (match-string 1)) 0))
+		(t)))
+	  (and org-agenda-todo-ignore-deadlines
+	       (re-search-forward org-deadline-time-regexp end t)
+	       (cond
+		((memq org-agenda-todo-ignore-deadlines '(t all)) t)
+		((eq org-agenda-todo-ignore-deadlines 'far)
+		 (not (org-deadline-close (match-string 1))))
+		(t (org-deadline-close (match-string 1)))))))))
 
 (defconst org-agenda-no-heading-message
   "No heading for this item in buffer or region.")
@@ -4914,6 +4957,8 @@ HH:MM."
 		    (mod h1 24) h1))
 	    (t0 (+ (* 100 h2) m))
 	    (t1 (concat (if (>= h1 24) "+" " ")
+ 			(if (and org-agenda-time-leading-zero
+ 				 (< t0 1000)) "0" "")
 			(if (< t0 100) "0" "")
 			(if (< t0 10)  "0" "")
 			(int-to-string t0))))
@@ -5404,22 +5449,22 @@ If the line does not have an effort defined, return nil."
 
 (defun org-agenda-manipulate-query-add ()
   "Manipulate the query by adding a search term with positive selection.
-Positive selection means, the term must be matched for selection of an entry."
+Positive selection means the term must be matched for selection of an entry."
   (interactive)
   (org-agenda-manipulate-query ?\[))
 (defun org-agenda-manipulate-query-subtract ()
   "Manipulate the query by adding a search term with negative selection.
-Negative selection means, term must not be matched for selection of an entry."
+Negative selection means term must not be matched for selection of an entry."
   (interactive)
   (org-agenda-manipulate-query ?\]))
 (defun org-agenda-manipulate-query-add-re ()
   "Manipulate the query by adding a search regexp with positive selection.
-Positive selection means, the regexp must match for selection of an entry."
+Positive selection means the regexp must match for selection of an entry."
   (interactive)
   (org-agenda-manipulate-query ?\{))
 (defun org-agenda-manipulate-query-subtract-re ()
   "Manipulate the query by adding a search regexp with negative selection.
-Negative selection means, regexp must not match for selection of an entry."
+Negative selection means regexp must not match for selection of an entry."
   (interactive)
   (org-agenda-manipulate-query ?\}))
 (defun org-agenda-manipulate-query (char)
@@ -5519,8 +5564,9 @@ With prefix ARG, go backward that many times the current span."
 (defun org-agenda-view-mode-dispatch ()
   "Call one of the view mode commands."
   (interactive)
-  (message "View: [d]ay [w]eek [m]onth [y]ear [l]og [L]og-all [a]rch-trees [A]rch-files
-       clock[R]eport   time[G]rid   [[]inactive  [E]ntryText   include[D]iary")
+  (message "View: [d]ay [w]eek [m]onth [y]ear                         [q]uit/abort
+      time[G]rid     [[]inactive [f]ollow [l]og [L]og-all   [E]ntryText
+      [a]rch-trees   [A]rch-files    clock[R]eport   include[D]iary")
   (let ((a (read-char-exclusive)))
     (case a
       (?d (call-interactively 'org-agenda-day-view))
@@ -6379,7 +6425,7 @@ If FORCE-TAGS is non nil, the car of it returns the new tags."
 	(goto-char (match-beginning 1))
 	(insert (org-add-props
 		    (make-string (max 1 (- c (current-column))) ?\ )
-		    (text-properties-at (point)))))
+		    (plist-put (text-properties-at (point)) 'face nil))))
       (goto-char (point-min))
       (org-font-lock-add-tag-faces (point-max)))))
 
@@ -6844,6 +6890,7 @@ The cursor may be at a date in the calendar, or in the Org agenda."
      ((equal char ?j)
       (org-switch-to-buffer-other-window
        (find-file-noselect org-agenda-diary-file))
+      (require 'org-datetree)
       (org-datetree-find-date-create d1)
       (org-reveal t))
      (t (error "Invalid selection character `%c'" char)))))
@@ -6893,13 +6940,29 @@ the resulting entry will not be shown.  When TEXT is empty, switch to
 	(insert (format "%%%%(diary-anniversary %s) %s"
 			(calendar-date-string d1 nil t) text))))
      ((eq type 'day)
-      (if (eq org-agenda-insert-diary-strategy 'top-level)
-	  (org-agenda-insert-diary-as-top-level text)
-	(require 'org-datetree)
-	(org-datetree-find-date-create d1)
-	(org-agenda-insert-diary-make-new-entry text))
-      (org-insert-time-stamp (org-time-from-absolute
-			      (calendar-absolute-from-gregorian d1)))
+      (let*
+	  (fmt time time2
+	       (org-agenda-time-leading-zero t))
+	(if org-agenda-search-headline-for-time
+	    ;; Use org-format-agenda-item to parse text for a time-range and
+	    ;; remove it.  
+	    (setq fmt (org-format-agenda-item nil text nil nil t)
+		  time (get-text-property 0 'time fmt)
+		  time2 (if (> (length time) 0)
+			    ;; split-string removes trailing ...... if
+			    ;; no end time given.  First space
+			    ;; separates time from date.
+			    (concat " " (car (split-string time "\\.")))
+			  nil)
+		  text (get-text-property 0 'txt fmt)))
+	(if (eq org-agenda-insert-diary-strategy 'top-level)
+	    (org-agenda-insert-diary-as-top-level text)
+	  (require 'org-datetree)
+	  (org-datetree-find-date-create d1)
+	  (org-agenda-insert-diary-make-new-entry text))
+	(org-insert-time-stamp (org-time-from-absolute
+				(calendar-absolute-from-gregorian d1))
+			       nil nil nil nil time2))
       (end-of-line 0))
      ((eq type 'block)
       (if (> (calendar-absolute-from-gregorian d1)
@@ -6948,7 +7011,7 @@ a timestamp can be added there."
     (org-back-over-empty-lines)
     (or (looking-at "[ \t]*$")
 	(progn (insert "\n") (backward-char 1)))
-    (org-insert-heading)
+    (org-insert-heading nil t)
     (org-do-demote)
     (setq col (current-column))
     (insert text "\n")

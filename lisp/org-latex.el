@@ -4,7 +4,7 @@
 ;;
 ;; Emacs Lisp Archive Entry
 ;; Filename: org-latex.el
-;; Version: 6.34c
+;; Version: 6.34trans
 ;; Author: Bastien Guerry <bzg AT altern DOT org>
 ;; Maintainer: Carsten Dominik <carsten.dominik AT gmail DOT com>
 ;; Keywords: org, wp, tex
@@ -92,7 +92,7 @@
 (defcustom org-export-latex-classes
   '(("article"
      "\\documentclass[11pt]{article}
-\\usepackage[utf8]{inputenc}
+\\usepackage[AUTO]{inputenc}
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
@@ -108,7 +108,7 @@
      ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
     ("report"
      "\\documentclass[11pt]{report}
-\\usepackage[utf8]{inputenc}
+\\usepackage[AUTO]{inputenc}
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
@@ -124,7 +124,7 @@
      ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
     ("book"
      "\\documentclass[11pt]{book}
-\\usepackage[utf8]{inputenc}
+\\usepackage[AUTO]{inputenc}
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
@@ -140,7 +140,7 @@
      ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
     ("beamer"
      "\\documentclass{beamer}
-\\usepackage[utf8]{inputenc}
+\\usepackage[AUTO]{inputenc}
 \\usepackage[T1]{fontenc}
 \\usepackage{graphicx}
 \\usepackage{longtable}
@@ -160,11 +160,31 @@ associated information.  Here is the structure of each cell:
     (numbered-section . unnumbered-section\)
     ...\)
 
-A %s formatter is mandatory in each section string and will be
-replaced by the title of the section.
+The header string
+-----------------
+
+The HEADER-STRING is the header that will be inserted into the LaTeX file.
+It should contain the \\documentclass macro, package call via \\usepackage
+and anything else you would always like to have in the header.  Note that
+the header will be augmented with additional usepackage statements
+according to the variable `org-export-latex-packages-alist', and also with
+lines specified via \"#+LaTeX_HEADER:\".
+If the header definition contains \"\\usepackage[AUTO]{inputenc}\", AUTO
+will automatically be replaced with a coding system derived from
+`buffer-file-coding-system'.  See also the variable
+`org-export-latex-inputenc-alist' for a way to influence this mechanism.
+
+
+The sectioning structure
+------------------------
+
+The sectioning structure of the class is given by the elements following
+the header string.  For ech sectioning level, a number of strings is
+specified.  A %s formatter is mandatory in each section string and will
+be replaced by the title of the section.
 
 Instead of a cons cell (numbered . unnumbered), you can also provide a list
-of 2-4 elements,
+of 2 or 4 elements,
 
   (numbered-open numbered-close)
 
@@ -177,7 +197,7 @@ represent the document section.  The opening clause should have a %s
 to represent the section title.
 
 Instead of a list of sectioning commands, you can also specify a
-function name.  that function will be called with two parameters,
+function name.  That function will be called with two parameters,
 the (reduced) level of the headline, and the headline text.  The functions
 returns a cons cell with the (possibly modified) headline text, and the
 sectioning list in the cdr."
@@ -277,6 +297,13 @@ markup defined, the first one in the association list will be used."
   :group 'org-export-latex
   :type 'string)
 
+(defcustom org-export-latex-hyperref-format "\\href{%s}{%s}"
+  "A printf format string to be applied to hyperref links.
+The format must contain two %s instances.  The first will be filled with
+the link, the second with the link description."
+  :group 'org-export-latex
+  :type 'string)
+
 (defcustom org-export-latex-tables-verbatim nil
   "When non-nil, tables are exported verbatim."
   :group 'org-export-latex
@@ -342,7 +369,7 @@ Defaults to \\begin{verbatim} and \\end{verbatim}."
 	       (string :tag "Close")))
 
 (defcustom org-export-latex-listings nil
-  "Non-nil means, export source code using the listings package.
+  "Non-nil means export source code using the listings package.
 This package will fontify source code, possibly even with color.
 If you want to use this, you also need to make LaTeX use the
 listings package, and if you want to have color, the color
@@ -444,7 +471,7 @@ This function should accept the file name as its single argument."
   :type '(repeat (string :tag "Extension")))
 
 (defcustom org-export-pdf-remove-logfiles t
-  "Non-nil means, remove the logfiles produced by PDF production.
+  "Non-nil means remove the logfiles produced by PDF production.
 These are the .aux, .log, .out, and .toc files."
   :group 'org-export-pdf
   :type 'boolean)
@@ -610,21 +637,29 @@ when PUB-DIR is set, use this as the publishing directory."
 		    (and (not
 			  (plist-get opt-plist :skip-before-1st-heading))
 			 (org-export-grab-title-from-buffer))
-		    (file-name-sans-extension
-		     (file-name-nondirectory buffer-file-name))))
-	 (filename (concat (file-name-as-directory
-			    (or pub-dir
-				(org-export-directory :LaTeX ext-plist)))
-			   (file-name-sans-extension
-			    (or (and subtree-p
-				     (org-entry-get rbeg "EXPORT_FILE_NAME" t))
-				(file-name-nondirectory ;sans-extension
-				 buffer-file-name)))
-			   ".tex"))
-	 (filename (if (equal (file-truename filename)
-			      (file-truename buffer-file-name))
-		       (concat filename ".tex")
-		     filename))
+		    (and buffer-file-name
+			 (file-name-sans-extension
+			  (file-name-nondirectory buffer-file-name)))
+		    "No Title"))
+	 (filename 
+	  (and (not to-buffer)
+	       (concat
+		(file-name-as-directory
+		 (or pub-dir
+		     (org-export-directory :LaTeX ext-plist)))
+		(file-name-sans-extension
+		 (or (and subtree-p
+			  (org-entry-get rbeg "EXPORT_FILE_NAME" t))
+		     (file-name-nondirectory ;sans-extension
+		      (or buffer-file-name
+			  (error "Don't know which export file to use.")))))
+		".tex")))
+	 (filename
+	  (and filename
+	       (if (equal (file-truename filename)
+			  (file-truename (or buffer-file-name "dummy.org")))
+		   (concat filename ".tex")
+		 filename)))
 	 (buffer (if to-buffer
 		     (cond
 		      ((eq to-buffer 'string) (get-buffer-create
@@ -1119,6 +1154,8 @@ OPT-PLIST is the options plist for current buffer."
      (org-export-apply-macros-in-string
       (plist-get opt-plist :latex-header-extra))
      (org-export-apply-macros-in-string org-export-latex-append-header)
+     ;; define align if not yet defined
+     "\\providecommand{\\alert}[1]{\\textbf{#1}}"
      ;; insert the title
      (format
       "\n\n\\title{%s}\n"
@@ -1280,9 +1317,10 @@ links, keywords, lists, tables, fixed-width"
     ;; the beginning of the buffer - inserting "\n" is safe here though.
     (insert "\n" string)
     (goto-char (point-min))
-    (let ((re (concat "\\\\[a-zA-Z]+\\(?:"
-		      "\\[.*\\]"
-		      "\\)?"
+    (let ((re (concat "\\\\[a-zA-Z]+"
+		      "\\(?:<[^<>\n]*>\\)*"
+		      "\\(?:\\[[^][\n]*?\\]\\)*"
+		      "\\(?:<[^<>\n]*>\\)*"
 		      (org-create-multibrace-regexp "{" "}" 3))))
       (while (re-search-forward re nil t)
 	(unless (save-excursion (goto-char (match-beginning 0))
@@ -1750,7 +1788,7 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 		;; a LaTeX issue, but we here implement a work-around anyway.
 		(setq path (org-export-latex-protect-amp path)
 		      desc (org-export-latex-protect-amp desc)))
-	      (insert (format "\\href{%s}{%s}" path desc)))
+	      (insert (format org-export-latex-hyperref-format path desc)))
 	     (t (insert "\\texttt{" desc "}")))))))
 
 
@@ -1868,13 +1906,15 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 	  (setq beg (+ (match-beginning 0) off) end (- (match-end 0) 0))
 	  (add-text-properties beg end '(org-protected t org-latex-math t))))))
 
-  ;; Convert LaTeX to \LaTeX{}
+  ;; Convert LaTeX to \LaTeX{} and TeX to \TeX{}
   (goto-char (point-min))
   (let ((case-fold-search nil))
-    (while (re-search-forward "\\([^+_]\\)LaTeX" nil t)
-      (org-if-unprotected
-       (replace-match (org-export-latex-protect-string
-		       (concat (match-string 1) "\\LaTeX{}")) t t))))
+    (while (re-search-forward "\\<\\(\\(La\\)?TeX\\)\\>" nil t)
+      (unless (eq (char-before (match-beginning 1)) ?\\)
+	(org-if-unprotected-1
+	 (replace-match (org-export-latex-protect-string
+			 (concat "\\" (match-string 1)
+				 "{}")) t t)))))
 
   ;; Convert blockquotes
   (goto-char (point-min))
@@ -1925,7 +1965,9 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
   (goto-char (point-min))
   (let ((re (concat
 	     "\\\\[a-zA-Z]+"
+	     "\\(?:<[^<>\n]*>\\)*"
 	     "\\(?:\\[[^][\n]*?\\]\\)*"
+	     "\\(?:<[^<>\n]*>\\)*"
 	     "\\(" (org-create-multibrace-regexp "{" "}" 3) "\\)\\{1,3\\}")))
     (while (re-search-forward re nil t)
       (unless (save-excursion (goto-char (match-beginning 0))
@@ -2011,18 +2053,19 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 (defun org-export-latex-fix-inputenc ()
   "Set the codingsystem in inputenc to what the buffer is."
   (let* ((cs buffer-file-coding-system)
-	 (opt (latexenc-coding-system-to-inputenc cs)))
+	 (opt (or (latexenc-coding-system-to-inputenc cs) "utf8")))
     (when opt
       ;; Translate if that is requested
       (setq opt (or (cdr (assoc opt org-export-latex-inputenc-alist)) opt))
       ;; find the \usepackage statement and replace the option
       (goto-char (point-min))
-      (while (re-search-forward "\\\\usepackage\\[\\(.*?\\)\\]{inputenc}"
+      (while (re-search-forward "\\\\usepackage\\[\\(AUTO\\)\\]{inputenc}"
 				nil t)
 	(goto-char (match-beginning 1))
 	(delete-region (match-beginning 1) (match-end 1))
 	(insert opt))
-      (save-buffer))))
+      (and buffer-file-name
+	   (save-buffer)))))
 
 ;;; List handling:
 

@@ -8,7 +8,7 @@
 ;;         Dan Davison <davison at stats dot ox dot ac dot uk>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -515,6 +515,7 @@ the language, a switch telling if the content should be in a single line."
   (interactive)
   (unless org-edit-src-from-org-mode
     (error "This is not a sub-editing buffer, something is wrong..."))
+  (widen)
   (let* ((beg org-edit-src-beg-marker)
 	 (end org-edit-src-end-marker)
 	 (ovl org-edit-src-overlay)
@@ -525,7 +526,7 @@ the language, a switch telling if the content should be in a single line."
 			   org-edit-src-content-indentation))
 	 (preserve-indentation org-src-preserve-indentation)
 	 (delta 0) code line col indent)
-    (untabify (point-min) (point-max))
+    (unless preserve-indentation (untabify (point-min) (point-max)))
     (save-excursion
       (goto-char (point-min))
       (if (looking-at "[ \t\n]*\n") (replace-match ""))

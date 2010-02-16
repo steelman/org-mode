@@ -5,7 +5,7 @@
 ;; Author: Eric Schulte <schulte dot eric at gmail dot com>
 ;; Keywords: tables, plotting
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -134,7 +134,7 @@ Pass PARAMS through to `orgtbl-to-generic' when exporting TABLE."
 
 (defun org-plot/gnuplot-to-grid-data (table data-file params)
   "Export the data in TABLE to DATA-FILE for gnuplot.
-This means, in a format appropriate for grid plotting by gnuplot.
+This means in a format appropriate for grid plotting by gnuplot.
 PARAMS specifies which columns of TABLE should be plotted as independent
 and dependant variables."
   (interactive)

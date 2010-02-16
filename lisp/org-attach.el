@@ -4,7 +4,7 @@
 
 ;; Author: John Wiegley <johnw@newartisans.com>
 ;; Keywords: org data task
-;; Version: 6.34c
+;; Version: 6.34trans
 
 ;; This file is part of GNU Emacs.
 ;;
@@ -92,7 +92,7 @@ ln    create a hard link.  Note that this is not supported
   :type 'boolean)
 
 (defcustom org-attach-allow-inheritance t
-  "Non-nil means, allow attachment directories be inherited."
+  "Non-nil means allow attachment directories be inherited."
   :group 'org-attach
   :type 'boolean)
 

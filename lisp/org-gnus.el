@@ -7,7 +7,7 @@
 ;;         Tassilo Horn <tassilo at member dot fsf dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -48,7 +48,7 @@
   (defvaralias 'org-usenet-links-prefer-google 'org-gnus-prefer-web-links))
 
 (defcustom org-gnus-prefer-web-links nil
-  "Non-nil means, `org-store-link' will create web links to Google groups.
+  "Non-nil means `org-store-link' will create web links to Google groups.
 When nil, Gnus will be used for such links.
 Using a prefix arg to the command \\[org-store-link] (`org-store-link')
 negates this setting for the duration of the command."

@@ -150,6 +150,7 @@ return nil."
 	    (case type
 	      ('results-line (org-babel-read-result))
 	      ('table (org-babel-read-table))
+              ('file (org-babel-read-file))
 	      ('source-block (org-babel-execute-src-block nil nil params))
 	      ('lob (org-babel-execute-src-block nil lob-info params))))
       (if (symbolp result)
@@ -192,8 +193,8 @@ which case the entire range is returned."
         (when (= depth 0)
           (setq return (reverse (cons (substring buffer 0 -1) return)))
           (setq buffer "")))
-       ((string= holder "(") (setq depth (+ depth 1)))
-       ((string= holder ")") (setq depth (- depth 1)))))
+       ((or (string= holder "(") (string= holder "[")) (setq depth (+ depth 1)))
+       ((or (string= holder ")") (string= holder "]")) (setq depth (- depth 1)))))
     (mapcar #'org-babel-trim (reverse (cons buffer return)))))
 
 (defun org-babel-ref-at-ref-p ()
@@ -202,6 +203,7 @@ of the supported reference types are found.  Supported reference
 types are tables and source blocks."
   (cond ((org-at-table-p) 'table)
         ((looking-at "^#\\+BEGIN_SRC") 'source-block)
+        ((looking-at org-bracket-link-regexp) 'file)
         ((looking-at org-babel-result-regexp) 'results-line)))
 
 (provide 'org-babel-ref)

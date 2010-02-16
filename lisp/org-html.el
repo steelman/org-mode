@@ -6,7 +6,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -81,7 +81,7 @@ and corresponding declarations."
 			(string :tag "Declaration")))))
 
 (defcustom org-export-html-style-include-scripts t
-  "Non-nil means, include the javascript snippets in exported HTML files.
+  "Non-nil means include the javascript snippets in exported HTML files.
 The actual script is defined in `org-export-html-scripts' and should
 not be modified."
   :group 'org-export-html
@@ -153,7 +153,7 @@ have the default style included, customize the variable
 `org-export-html-style-include-default'.")
 
 (defcustom org-export-html-style-include-default t
-  "Non-nil means, include the default style in exported HTML files.
+  "Non-nil means include the default style in exported HTML files.
 The actual style is defined in `org-export-html-style-default' and should
 not be modified.  Use the variables `org-export-html-style' to add
 your own style information."
@@ -253,7 +253,7 @@ document title."
   :type 'string)
 
 (defcustom org-export-html-link-org-files-as-html t
-  "Non-nil means, make file links to `file.org' point to `file.html'.
+  "Non-nil means make file links to `file.org' point to `file.html'.
 When org-mode is exporting an org-mode file to HTML, links to
 non-html files are directly put into a href tag in HTML.
 However, links to other Org-mode files (recognized by the
@@ -265,7 +265,7 @@ When nil, the links still point to the plain `.org' file."
   :type 'boolean)
 
 (defcustom org-export-html-inline-images 'maybe
-  "Non-nil means, inline images into exported HTML pages.
+  "Non-nil means inline images into exported HTML pages.
 This is done using an <img> tag.  When nil, an anchor with href is used to
 link to the image.  If this option is `maybe', then images in links with
 an empty description will be inlined, while images with a description will
@@ -333,13 +333,13 @@ will give even lines the class \"tr-even\" and odd lines the class \"tr-odd\"."
 
 
 (defcustom org-export-html-table-use-header-tags-for-first-column nil
-  "Non-nil means, format column one in tables with header tags.
+  "Non-nil means format column one in tables with header tags.
 When nil, also column one will use data tags."
   :group 'org-export-tables
   :type 'boolean)
 
 (defcustom org-export-html-validation-link nil
-  "Non-nil means, add validationlink to postamble of HTML exported files."
+  "Non-nil means add validationlink to postamble of HTML exported files."
   :group 'org-export-html
   :type '(choice
 	  (const :tag "Nothing" nil)
@@ -2003,6 +2003,7 @@ When TITLE is nil, just close all open levels."
   (org-close-par-maybe)
   (let* ((target (and title (org-get-text-property-any 0 'target title)))
 	 (extra-targets (assoc target org-export-target-aliases))
+	 (extra-class (and title (org-get-text-property-any 0 'html-container-class title)))
 	 (preferred (cdr (assoc target org-export-preferred-target-alist)))
 	 (remove (or preferred target))
 	 (l org-level-max)
@@ -2066,8 +2067,9 @@ When TITLE is nil, just close all open levels."
 	(setq href (cdr (assoc (concat "sec-" snumber) org-export-preferred-target-alist)))
 	(setq suffix (or href snumber))
 	(setq href (or href (concat "sec-" snumber)))
-	(insert (format "\n<div id=\"outline-container-%s\" class=\"outline-%d\">\n<h%d id=\"%s\">%s%s</h%d>\n<div class=\"outline-text-%d\" id=\"text-%s\">\n"
-			suffix level level href
+	(insert (format "\n<div id=\"outline-container-%s\" class=\"outline-%d%s\">\n<h%d id=\"%s\">%s%s</h%d>\n<div class=\"outline-text-%d\" id=\"text-%s\">\n"
+			suffix level (if extra-class (concat " " extra-class) "")
+			level href
 			extra-targets
 			title level level suffix))
 	(org-open-par)))))

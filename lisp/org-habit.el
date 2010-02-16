@@ -5,7 +5,7 @@
 ;; Author: John Wiegley <johnw at gnu dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 ;;
 ;; This file is part of GNU Emacs.
 ;;
@@ -305,7 +305,7 @@ current time."
 (defun org-habit-insert-consistency-graphs (&optional line)
   "Insert consistency graph for any habitual tasks."
   (let ((inhibit-read-only t) l c
-	(buffer-invisibility-spec nil)
+	(buffer-invisibility-spec '(org-link))
 	(moment (time-subtract (current-time)
 			       (list 0 (* 3600 org-extend-today-until) 0))))
     (save-excursion

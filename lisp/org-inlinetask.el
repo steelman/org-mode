@@ -5,7 +5,7 @@
 ;; Author: Carsten Dominik <carsten at orgmode dot org>
 ;; Keywords: outlines, hypermedia, calendar, wp
 ;; Homepage: http://orgmode.org
-;; Version: 6.34c
+;; Version: 6.34trans
 
 ;; This file is part of GNU Emacs.
 
@@ -94,7 +94,7 @@ the value of this variable."
   :type 'boolean)
 
 (defcustom org-inlinetask-export t
-  "Non-nil means, export inline tasks.
+  "Non-nil means export inline tasks.
 When nil, they will not be exported."
   :group 'org-inlinetask
   :type 'boolean)

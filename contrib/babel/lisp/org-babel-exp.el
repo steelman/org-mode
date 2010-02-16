@@ -56,6 +56,8 @@ will be indented by this many characters. See
 `org-babel-function-def-export-name' for the definition of a
 source block function.")
 
+(defvar obe-marker nil)
+
 (defun org-babel-exp-src-blocks (body &rest headers)
   "Process src block for export.  Depending on the 'export'
 headers argument in replace the source code block with...
@@ -71,11 +73,10 @@ results - just like none only the block is run on export ensuring
 none ----- do not display either code or results upon export"
   (interactive)
   (message "org-babel-exp processing...")
-  (or (and (re-search-backward org-babel-src-block-regexp nil t)
-           (org-babel-exp-do-export (org-babel-get-src-block-info) 'block))
-      (and (re-search-backward org-block-regexp nil t)
-           (match-string 0))
-      (error "Unmatched block [bug in `org-babel-exp-src-blocks'].")))
+  (when (member (first headers) org-babel-interpreters)
+    (save-excursion
+      (goto-char (match-beginning 0))
+      (org-babel-exp-do-export (org-babel-get-src-block-info) 'block))))
 
 (defun org-babel-exp-inline-src-blocks (start end)
   "Process inline src blocks between START and END for export.
@@ -127,22 +128,28 @@ options are taken from `org-babel-default-header-args'."
 
 (defun org-babel-exp-code (info type)
   (let ((lang (first info))
-	(body (second info))
-	(switches (fourth info))
-	(name (fifth info))
-	(args (sixth info))
-	(function-def-line ""))
+        (body (second info))
+        (switches (fourth info))
+        (name (fifth info))
+        (args (mapcar #'cdr
+                      (remove-if-not (lambda (el) (eq :var (car el))) (third info)))))
     (case type
-      ('inline (format "=%s=" (second info)))
+      ('inline (format "=%s=" body))
       ('block
           (let ((str (format "#+BEGIN_SRC %s %s\n%s%s#+END_SRC\n" lang switches body
-                        (if (string-match "\n$" body) "" "\n"))))
-            (add-text-properties 0 (length str) (list 'org-caption name) str)
-            str))
-      ('lob (save-excursion
-	      (re-search-backward org-babel-lob-one-liner-regexp)
-	      (format "#+BEGIN_SRC org-babel-lob\n%s\n#+END_SRC"
-                      (first (org-babel-lob-get-info))))))))
+                             (if (string-match "\n$" body) "" "\n"))))
+            (add-text-properties 0 (length str)
+                                 (list 'org-caption
+                                       (format "%s(%s)"
+                                               name (mapconcat #'identity args ", ")))
+                                 str) str))
+      ('lob
+       (let ((call-line (and (string-match "results=" (car args))
+                             (substring (car args) (match-end 0)))))
+         (cond
+          ((eq backend 'html)
+           (format "\n#+HTML: <label class=\"org-src-name\">%s</label>\n" call-line))
+          ((t (format ": %s\n" call-line)))))))))
 
 (defun org-babel-exp-results (info type)
   (let ((lang (first info))
