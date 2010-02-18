@@ -259,12 +259,20 @@ know about that group' function. Volunteers?"
   :group 'org-mairix-gnus
   :type 'hook)
 
+(defcustom org-mairix-gnus-groups
+  "^nn\\(?:folder\\|mbox\\|maildir\\|ml\\)+.*"
+  "Define which groups are indexed with mairix. If the group doesn't
+match this regular expression an ordirary gnus: link will be created."
+  :group 'org-mairix-gnus
+  :type 'string)
+
 (defun org-mairix-store-gnus-link ()
   "Store a link to the current gnus message as a Mairix search for its
 Message ID."
 
   ;; gnus integration
-  (when (memq major-mode '(gnus-summary-mode gnus-article-mode))
+  (when (and (memq major-mode '(gnus-summary-mode gnus-article-mode))
+	     (string-match org-mairix-gnus-groups gnus-newsgroup-name))
     (and (eq major-mode 'gnus-article-mode) (gnus-article-show-summary))
     (let* ((article (gnus-summary-article-number))
            (header (gnus-summary-article-header article))
