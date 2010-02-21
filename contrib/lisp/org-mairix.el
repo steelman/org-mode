@@ -82,8 +82,11 @@ correctly, you should not need to change this.
 
 ;;; The hooks to integrate mairix into org
 
-(org-add-link-type "mairix" 'org-mairix-open)
-(add-hook 'org-store-link-functions 'org-mairix-store-gnus-link)
+(org-add-link-type "mairix" (cond
+			     ((eq mail-user-agent 'gnus-user-agent)
+			      'org-mairix-gnus-open)
+			     (t 'org-mairix-open)))
+(add-hook 'org-store-link-functions 'org-mairix-gnus-store-link)
 
 ;;; Generic org-mairix functions
 
@@ -92,7 +95,7 @@ correctly, you should not need to change this.
   (concat "mairix:"
           (if org-mairix-threaded-links "t:")
           (if org-mairix-augmented-links "a:")
-          "@@"
+          "m:"
           (org-remove-angle-brackets message-id)))
 
 (defun org-store-mairix-link-props (&rest plist)
@@ -259,12 +262,25 @@ know about that group' function. Volunteers?"
   :group 'org-mairix-gnus
   :type 'hook)
 
-(defun org-mairix-store-gnus-link ()
-  "Store a link to the current gnus message as a Mairix search for its
-Message ID."
+(defcustom org-mairix-gnus-groups
+  "^nn\\(?:folder\\|mbox\\|maildir\\|ml\\)+.*"
+  "Define which groups are indexed with mairix. If the group doesn't
+match this regular expression an ordirary gnus: link will be created."
+  :group 'org-mairix-gnus
+  :type 'string)
 
-  ;; gnus integration
-  (when (memq major-mode '(gnus-summary-mode gnus-article-mode))
+(defun org-mairix-gnus-store-link ()
+  "Store a link to the current gnus message as a Mairix search for its
+Message ID.
+
+This function works only in a *Summary* and an *Article* buffer
+of selected groups, see: `org-mairix-gnus-groups'. It needs to be
+called before `org-gnus-store-link' so in case it doesn't succeed
+an ordinary gnus: link is created. Remember to load org-mairix
+after org-gnus."
+
+  (when (and (memq major-mode '(gnus-summary-mode gnus-article-mode))
+	     (string-match org-mairix-gnus-groups gnus-newsgroup-name))
     (and (eq major-mode 'gnus-article-mode) (gnus-article-show-summary))
     (let* ((article (gnus-summary-article-number))
            (header (gnus-summary-article-header article))
@@ -275,57 +291,26 @@ Message ID."
                                    :subject subject
                                    :message-id message-id))))
 
-(defun org-mairix-gnus-display-results (search args)
-  "Display results of mairix search in Gnus.
+(defun org-mairix-gnus-open (search)
+  "Open mairix link in Gnus.
 
-Note: This does not work as cleanly as I would like it to. The
-problem being that Gnus should simply reread the group cleanly,
-without remembering anything. At the moment it seems to be unable
-to do that -- so you're likely to see zombies floating around.
+It uses nnmairix backend searching function so you need to set up
+nnmairirx in Gnus beforehand.  Please refere to Info node `(gnus) nnmairix'
+for further information.
 
-If you can improve this, please do!"
-  (if (not (equal (substring search 0 2) "m:" ))
-      (error "org-mairix-gnus-display-results: display of search other than 
-message-id not implemented yet"))
-  (setq message-id (substring search 2 nil))
-  (require 'gnus)
-  (require 'gnus-sum)
-  ;; FIXME: (bzg/gg) We might need to make sure gnus is running here,
-  ;;        and to start it in case it isn't running already. Does
-  ;;        anyone know a function to do that? It seems main org mode
-  ;;        does not do this, either.
-  (funcall (cdr (assq 'gnus org-link-frame-setup)))
-  (if gnus-other-frame-object (select-frame gnus-other-frame-object))
-
-  ;; FIXME: This is horribly broken. Please see
-  ;;  http://article.gmane.org/gmane.emacs.gnus.general/65248
-  ;;  http://article.gmane.org/gmane.emacs.gnus.general/65265
-  ;;  http://article.gmane.org/gmane.emacs.gnus.user/9596
-  ;; for reference.
-  ;;
-  ;; It seems gnus needs a "forget/ignore everything you think you
-  ;; know about that group" function. Volunteers?
-  ;;
-  ;; For now different methods seem to work differently well for
-  ;; different people. So we're playing hook-selection here to make
-  ;; it easy to play around until we found a proper solution.
-  (run-hook-with-args 'org-mairix-gnus-select-display-group-function)
-  (gnus-summary-select-article
-   nil t t (car (gnus-find-matching-articles "message-id" message-id))))
-
-(defun org-mairix-gnus-select-display-group-function-gg ()
-  "Georg's hack to select a group that gnus (falsely) believes to be
-empty to then call rebuilding of the summary. It leaves zombies of
-old searches around, though."
-  (gnus-group-quick-select-group 0 org-mairix-gnus-results-group)
-  (gnus-group-clear-data)
-  (gnus-summary-reselect-current-group t t))
-
-(defun org-mairix-gnus-select-display-group-function-bzg ()
-  "This is the classic way the org mode is using, and it seems to be
-using better for Bastien, so it may work for you."
-  (gnus-group-clear-data org-mairix-gnus-results-group)
-  (gnus-group-read-group t nil org-mairix-gnus-results-group))
+As of wrinting this (2010-02-18) nnmairix does not support
+augmented searches so we simply discard the a: flag."
+  ;; TODO add an option to choose nnmairix "server"
+  (let* ( threads )
+    (when (equal (substring search 0 2) "t:" )
+      (setq search (substring search 2 nil))
+      (setq threads t))
+    (when (equal (substring search 0 2) "a:")
+      (setq search (substring search 2 nil)))
+    (funcall (cdr (assq 'gnus org-link-frame-setup)))
+    (if gnus-other-frame-object (select-frame gnus-other-frame-object))
+    (nnmairix-search search nil nil)
+    (gnus-summary-goto-article (substring search 2 nil) nil t)))
 
 (provide 'org-mairix)
 
