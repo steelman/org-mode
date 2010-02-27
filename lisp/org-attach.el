@@ -245,7 +245,7 @@ This checks for the existence of a \".git\" directory in that directory."
 	(shell-command
 	 (concat "(cd " dir "; "
 		 " git add .; "
-		 " git ls-files --deleted -z | xargs -0 git rm; "
+		 " git ls-files --deleted -z | xargs --no-run-if-empty -0 git rm; "
 		 " git commit -m 'Synchronized attachments')")))))
 
 (defun org-attach-tag (&optional off)
