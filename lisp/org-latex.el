@@ -99,6 +99,7 @@
 \\usepackage{float}
 \\usepackage{wrapfig}
 \\usepackage{soul}
+\\usepackage{latexsym}
 \\usepackage{amssymb}
 \\usepackage{hyperref}"
      ("\\section{%s}" . "\\section*{%s}")
@@ -115,6 +116,7 @@
 \\usepackage{float}
 \\usepackage{wrapfig}
 \\usepackage{soul}
+\\usepackage{latexsym}
 \\usepackage{amssymb}
 \\usepackage{hyperref}"
      ("\\part{%s}" . "\\part*{%s}")
@@ -131,6 +133,7 @@
 \\usepackage{float}
 \\usepackage{wrapfig}
 \\usepackage{soul}
+\\usepackage{latexsym}
 \\usepackage{amssymb}
 \\usepackage{hyperref}"
      ("\\part{%s}" . "\\part*{%s}")
@@ -147,6 +150,7 @@
 \\usepackage{float}
 \\usepackage{wrapfig}
 \\usepackage{soul}
+\\usepackage{latexsym}
 \\usepackage{amssymb}
 \\usepackage{hyperref}"
      org-beamer-sectioning
@@ -1388,7 +1392,8 @@ See the `org-export-latex.el' code for a complete conversion table."
 		     (if (equal (match-string 1) "\\")
 			 (replace-match (match-string 2) t t)
 		       (replace-match (concat (match-string 1) "\\"
-					      (match-string 2)) t t)))
+					      (match-string 2)) t t)
+		       (backward-char 1)))
 		    ((equal (match-string 2) "...")
 		     (replace-match
 		      (concat (match-string 1)
@@ -1540,8 +1545,9 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
   ;; First, get the table.el tables
   (goto-char (point-min))
   (while (re-search-forward "^[ \t]*\\(\\+-[-+]*\\+\\)[ \t]*\n[ \t]*|" nil t)
-    (require 'table)
-    (org-export-latex-convert-table.el-table))
+    (org-if-unprotected
+     (require 'table)
+     (org-export-latex-convert-table.el-table)))
 
   ;; And now the Org-mode tables
   (goto-char (point-min))

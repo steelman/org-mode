@@ -2129,8 +2129,11 @@ compact.  The default settings can be configured using the variable
 @code{org-calc-default-modes}.
 
 @example
-p20           @r{switch the internal precision to 20 digits}
-n3 s3 e2 f4   @r{normal, scientific, engineering, or fixed display format}
+p20           @r{set the internal Calc calculation precision to 20 digits}
+n3 s3 e2 f4   @r{Normal, scientific, engineering, or fixed}
+              @r{format of the result of Calc passed back to Org.}
+              @r{Calc formatting is unlimited in precision as}
+              @r{long as the Calc calculation precision is greater.}
 D R           @r{angle modes: degrees, radians}
 F S           @r{fraction and symbolic modes}
 N             @r{interpret all fields as numbers, use 0 for non-numbers}
@@ -2140,8 +2143,16 @@ L             @r{literal}
 @end example
 
 @noindent
-In addition, you may provide a @code{printf} format specifier to
-reformat the final result.  A few examples:
+Unless you use large integer numbers or high-precision-calculation
+and -display for floating point numbers you may alternatively provide a
+@code{printf} format specifier to reformat the Calc result after it has been
+passed back to Org instead of letting Calc already do the
+formatting@footnote{The @code{printf} reformatting is limited in precision
+because the value passed to it is converted into an @code{integer} or
+@code{double}.  The @code{integer} is limited in size by truncating the
+signed value to 32 bits.  The @code{double} is limited in precision to 64
+bits overall which leaves approximately 16 significant decimal digits.}.
+A few examples:
 
 @example
 $1+$2                @r{Sum of first and second field}
@@ -2758,6 +2769,8 @@ file:/home/dominik/images/jupiter.jpg     @r{file, absolute path}
 /home/dominik/images/jupiter.jpg          @r{same as above}
 file:papers/last.pdf                      @r{file, relative path}
 ./papers/last.pdf                         @r{same as above}
+file:/myself@@some.where:papers/last.pdf   @r{file, path on remote machine}
+/myself@@some.where:papers/last.pdf        @r{same as above}
 file:sometextfile::NNN                    @r{file with line number to jump to}
 file:projects.org                         @r{another Org file}
 file:projects.org::some words             @r{text search in Org file}
@@ -10092,10 +10105,12 @@ the Emacs @file{tramp} package.  Or you can publish to a local directory and
 use external tools to upload your website (@pxref{Uploading files}).
 @item @code{:preparation-function}
 @tab Function called before starting the publishing process, for example, to
-run @code{make} for updating files to be published.
+run @code{make} for updating files to be published.  The project property
+list is scoped into this call as the variable @code{project-plist}.
 @item @code{:completion-function}
 @tab Function called after finishing the publishing process, for example, to
-change permissions of the resulting files.
+change permissions of the resulting files.  The project property list is
+scoped into this call as the variable @code{project-plist}.
 @end multitable
 @noindent
 
@@ -10156,10 +10171,11 @@ list of functions, which will all be called in turn.
 @tab Non-nil means, publish htmlized source.
 @end multitable
 
-The function must accept two arguments: a property list containing at least a
-@code{:publishing-directory} property, and the name of the file to be
-published.  It should take the specified file, make the necessary
-transformation (if any) and place the result into the destination folder.
+The function must accept three arguments: a property list containing at least
+a @code{:publishing-directory} property, the name of the file to be
+published, and the path to the publishing directory of the output file.  It
+should take the specified file, make the necessary transformation (if any)
+and place the result into the destination folder.
 
 @node Publishing options, Publishing links, Publishing action, Configuration
 @subsection Options for the HTML/La@TeX{} exporters

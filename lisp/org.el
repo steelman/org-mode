@@ -2145,8 +2145,8 @@ set."
   :type 'boolean)
 
 (defcustom org-log-states-order-reversed t
-  "Non-nil means the latest state change note will be directly after heading.
-When nil, the notes will be orderer according to time."
+  "Non-nil means the latest state note will be directly after heading.
+When nil, the state change notes will be ordered according to time."
   :group 'org-todo
   :group 'org-progress
   :type 'boolean)
@@ -7950,12 +7950,14 @@ This is the list that is used before handing over to the browser.")
       (url-unhex-string text)
     (setq table (or table org-link-escape-chars))
     (when text
-      (let ((re (mapconcat (lambda (x) (regexp-quote (cdr x)))
+      (let ((case-fold-search t)
+	    (re (mapconcat (lambda (x) (regexp-quote (downcase (cdr x))))
 			   table "\\|")))
 	(while (string-match re text)
 	  (setq text
 		(replace-match
-		 (char-to-string (car (rassoc (match-string 0 text) table)))
+		 (char-to-string (car (rassoc (upcase (match-string 0 text))
+					      table)))
 		 t t text)))
 	text))))
 
