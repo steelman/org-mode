@@ -604,11 +604,6 @@ far     Don't show TODO entries where a deadline has been defined, but
 past    Don't show entries with a deadline timestamp for today or in the past.
 
 future  Don't show entries with a deadline timestamp in the future, not even
-        when they become `near' ones.  Use it with caution.
-
-past    Don't show entries with a deadline timestamp for today or in the past.
-
-future  Don't show entries with a deadline timestamp in the future, not even
         when they become `near' ones. Use it with caution.
 
 all     Ignore all TODO entries that do have a deadline.       
