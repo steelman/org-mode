@@ -134,7 +134,6 @@ With prefix arg HERE, insert it at point."
   "Outline-based notes management and organizer."
   :tag "Org"
   :group 'outlines
-  :group 'hypermedia
   :group 'calendar)
 
 (defcustom org-mode-hook nil
@@ -1464,9 +1463,10 @@ you can use this variable to set the application for a given file
 extension.  The entries in this list are cons cells where the car identifies
 files and the cdr the corresponding command.  Possible values for the
 file identifier are
- \"regex\"     Regular expression matched against the file name.  For backward
-               compatibility, this can also be a string with only alphanumeric
-               characters, which is then interpreted as an extension.
+ \"regex\"       Regular expression matched against the file: link.  For
+               backward compatibility, this can also be a string with only
+               alphanumeric characters, which is then interpreted as an
+               extension.
  `directory'   Matches a directory
  `remote'      Matches a remote file, accessible through tramp or efs.
                Remote files most likely should be visited through Emacs
@@ -1495,9 +1495,13 @@ Possible values for the command are:
                does define this command, but you can overrule/replace it
                here.
  string        A command to be executed by a shell; %s will be replaced
-               by the path to the file.
+               by the path to the file.  If the file identifier is a regex,
+               %n will be replaced by the match of the nth match group.
  sexp          A Lisp form which will be evaluated.  The file path will
-               be available in the Lisp variable `file'.
+               be available in the Lisp variable `file', the link itself
+               in the Lisp variable `link'. If the file identifier is a regex,
+               the original match data will be restored, so subexpression
+               matches are accessible using (match-string n link).
 For more examples, see the system specific constants
 `org-file-apps-defaults-macosx'
 `org-file-apps-defaults-windowsnt'
@@ -1583,6 +1587,33 @@ are matched against file names, and values."
 	  (const :tag "Reverse never" nil)
 	  (repeat :tag "By file name regexp"
 		  (cons regexp boolean))))
+
+(defcustom org-log-refile nil
+  "Information to record when a task is refiled.
+
+Possible values are:
+
+nil     Don't add anything
+time    Add a time stamp to the task
+note    Prompt for a note and add it with template `org-log-note-headings'
+
+This option can also be set with on a per-file-basis with
+
+   #+STARTUP: nologrefile
+   #+STARTUP: logrefile
+   #+STARTUP: lognoterefile
+
+You can have local logging settings for a subtree by setting the LOGGING
+property to one or more of these keywords.
+
+When bulk-refiling from the agenda, the value `note' is forbidden and
+will temporarily be changed to `time'."
+  :group 'org-refile
+  :group 'org-progress
+  :type '(choice
+	  (const :tag "No logging" nil)
+	  (const :tag "Record timestamp" time)
+	  (const :tag "Record timestamp with note." note)))
 
 (defcustom org-refile-targets nil
   "Targets for refiling entries with \\[org-refile].
@@ -2065,6 +2096,7 @@ When nil, only the date will be recorded."
     (delschedule .  "Not scheduled, was %S on %t")
     (redeadline .  "New deadline from %S on %t")
     (deldeadline .  "Removed deadline, was %S on %t")
+    (refile . "Refiled on %t")
     (clock-out . ""))
   "Headings for notes added to entries.
 The value is an alist, with the car being a symbol indicating the note
@@ -2089,8 +2121,9 @@ agenda log mode depends on the format of these entries."
 	  (cons (const :tag "Heading when clocking out" clock-out) string)
 	  (cons (const :tag "Heading when an item is no longer scheduled" delschedule) string)
 	  (cons (const :tag "Heading when rescheduling" reschedule) string)
-	  (cons (const :tag "Heading when changing deadline"  redeadline) string
-		(cons (const :tag "Heading when deleting a deadline" deldeadline) string))))
+	  (cons (const :tag "Heading when changing deadline"  redeadline) string)
+	  (cons (const :tag "Heading when deleting a deadline" deldeadline) string)
+	  (cons (const :tag "Heading when refiling" refile) string)))
 
 (unless (assq 'note org-log-note-headings)
   (push '(note . "%t") org-log-note-headings))
@@ -3791,6 +3824,9 @@ After a match, the following groups carry important information:
     ("logredeadline" org-log-redeadline time)
     ("lognoteredeadline" org-log-redeadline note)
     ("nologredeadline" org-log-redeadline nil)
+    ("logrefile" org-log-refile time)
+    ("lognoterefile" org-log-refile note)
+    ("nologrefile" org-log-refile nil)
     ("fninline" org-footnote-define-inline t)
     ("nofninline" org-footnote-define-inline nil)
     ("fnlocal" org-footnote-section nil)
@@ -6185,6 +6221,9 @@ This is important for non-interactive uses of the command."
 	      (setq pos (point-at-bol))
 	      (or split (end-of-line 1))
 	      (delete-horizontal-space)
+	      (if (string-match "\\`\\*+\\'"
+				(buffer-substring (point-at-bol) (point)))
+		  (insert " "))
 	      (newline (if blank 2 1))
 	      (when tags
 		(save-excursion
@@ -6379,10 +6418,29 @@ The level is the number of stars at the beginning of the headline."
 	  (funcall outline-level))
       (error nil))))
 
+(defun org-get-previous-line-level ()
+  "Return the outline depth of the last headline before the current line.
+Returns 0 for the first headline in the buffer, and nil if before the
+first headline."
+  (let ((current-level (org-current-level))
+	(prev-level (when (> (line-number-at-pos) 1)
+		      (save-excursion
+			(beginning-of-line 0)
+			(org-current-level)))))
+    (cond ((null current-level) nil) ; Before first headline
+	  ((null prev-level) 0)      ; At first headline
+	  (prev-level))))
+
 (defun org-reduced-level (l)
   "Compute the effective level of a heading.
 This takes into account the setting of `org-odd-levels-only'."
   (if org-odd-levels-only (1+ (floor (/ l 2))) l))
+
+(defun org-level-increment ()
+  "Return the number of stars that will be added or removed at a
+time to headlines when structure editing, based on the value of
+`org-odd-levels-only'."
+  (if org-odd-levels-only 2 1))
 
 (defun org-get-valid-level (level &optional change)
   "Rectify a level change under the influence of `org-odd-levels-only'
@@ -6431,30 +6489,41 @@ in the region."
     (if org-adapt-indentation (org-fixup-indentation diff))
     (run-hooks 'org-after-demote-entry-hook)))
 
-(defvar org-tab-ind-state nil)
-
 (defun org-cycle-level ()
+  "Cycle the level of an empty headline through possible states.
+This goes first to child, then to parent, level, then up the hierarchy.
+After top level, it switches back to sibling level."
+  (interactive)
   (let ((org-adapt-indentation nil))
-    (when (and (looking-at "[ \t]*$")
-	       (org-looking-back
-		(concat "^\\(\\*+\\)[ \t]+\\(" org-todo-regexp "\\)?[ \t]*")))
-      (setq this-command 'org-cycle-level)
-      (if (eq last-command 'org-cycle-level)
-	  (condition-case nil
-	      (progn (org-do-promote)
-		     (if (equal org-tab-ind-state (org-current-level))
-			 (org-do-promote)))
-	    (error
-	     (progn
-	       (save-excursion
-		 (beginning-of-line 1)
-		 (and (looking-at "\\*+")
-		      (replace-match
-		       (make-string org-tab-ind-state ?*))))
-	       (setq this-command 'org-cycle))))
-	(setq org-tab-ind-state (- (match-end 1) (match-beginning 1)))
-	(org-do-demote))
-      t)))
+    (when (org-point-at-end-of-empty-headline)
+      (setq this-command 'org-cycle-level) ; Only needed for caching
+      (let ((cur-level (org-current-level))
+            (prev-level (org-get-previous-line-level)))
+        (cond
+         ;; If first headline in file, promote to top-level.
+         ((= prev-level 0)
+          (loop repeat (/ (- cur-level 1) (org-level-increment))
+                do (org-do-promote)))
+         ;; If same level as prev, demote one.
+         ((= prev-level cur-level)
+          (org-do-demote))
+         ;; If parent is top-level, promote to top level if not already.
+         ((= prev-level 1)
+          (loop repeat (/ (- cur-level 1) (org-level-increment))
+                do (org-do-promote)))
+         ;; If top-level, return to prev-level.
+         ((= cur-level 1)
+          (loop repeat (/ (- prev-level 1) (org-level-increment))
+                do (org-do-demote)))
+         ;; If less than prev-level, promote one.
+         ((< cur-level prev-level)
+          (org-do-promote))
+         ;; If deeper than prev-level, promote until higher than
+         ;; prev-level.
+         ((> cur-level prev-level)
+          (loop repeat (+ 1 (/ (- cur-level prev-level) (org-level-increment)))
+                do (org-do-promote))))
+        t))))
 
 (defun org-map-tree (fun)
   "Call FUN for every heading underneath the current one."
@@ -7913,7 +7982,7 @@ according to FMT (default from `org-email-link-description-format')."
     (?\371 . "%F9")  ; `u
     (?\373 . "%FB")  ; ^u
     (?\;   . "%3B")
-    (??    . "%3F")
+;;  (??    . "%3F")
     (?=    . "%3D")
     (?+    . "%2B")
     )
@@ -8389,6 +8458,10 @@ Org-mode syntax."
 	(org-mode)
 	(insert s)
 	(goto-char (point-min))
+	(when reference-buffer
+	  (setq org-link-abbrev-alist-local
+		(with-current-buffer reference-buffer
+		  org-link-abbrev-alist-local)))
 	(org-open-at-point arg reference-buffer)))))
 
 (defun org-open-at-point (&optional in-emacs reference-buffer)
@@ -8974,10 +9047,12 @@ With a double C-c C-u prefix arg, Org tries to avoid opening in Emacs
 and to use an external application to visit the file.
 
 Optional LINE specifies a line to go to, optional SEARCH a string to
-search for.  If LINE or SEARCH is given, the file will always be
-opened in Emacs.
+search for.  If LINE or SEARCH is given, but IN-EMACS is nil, it will
+be assumed that org-open-file was called to open a file: link, and the
+original link to match against org-file-apps will be reconstructed 
+from PATH and whichever of LINE or SEARCH is given.
+
 If the file does not exist, an error is thrown."
-  (setq in-emacs (or in-emacs line search))
   (let* ((file (if (equal path "")
 		   buffer-file-name
 		 (substitute-in-file-name (expand-file-name path))))
@@ -8989,10 +9064,19 @@ If the file does not exist, an error is thrown."
 		 file))
 	 (a-m-a-p (assq 'auto-mode apps))
 	 (dfile (downcase file))
+	 ;; reconstruct the original file: link from the PATH, LINE and SEARCH args
+	 (link (cond ((and (eq line nil)
+			    (eq search nil))
+		       file)
+		      (line
+		      (concat file "::" (number-to-string line)))
+		     (search
+		      (concat file "::" search))))
+	 (dlink (downcase link))
 	 (old-buffer (current-buffer))
 	 (old-pos (point))
 	 (old-mode major-mode)
-	 ext cmd)
+	 ext cmd link-match-data)
     (if (string-match "^.*\\.\\([a-zA-Z0-9]+\\.gz\\)$" dfile)
 	(setq ext (match-string 1 dfile))
       (if (string-match "^.*\\.\\([a-zA-Z0-9]+\\)$" dfile)
@@ -9004,8 +9088,15 @@ If the file does not exist, an error is thrown."
      (t
       (setq cmd (or (and remp (cdr (assoc 'remote apps)))
 		    (and dirp (cdr (assoc 'directory apps)))
-		    (assoc-default dfile (org-apps-regexp-alist apps a-m-a-p)
-				   'string-match)
+		    ;; if we find a match in org-file-apps, store the match
+		    ;; data for later
+		    (let ((match (assoc-default dlink (org-apps-regexp-alist
+						       apps a-m-a-p)
+						'string-match)))
+		      (if match
+			  (progn (setq link-match-data (match-data))
+				 match)
+			nil))
 		    (cdr (assoc ext apps))
 		    (cdr (assoc t apps))))))
     (when (eq cmd 'system)
@@ -9035,6 +9126,18 @@ If the file does not exist, an error is thrown."
 		     (shell-quote-argument
 		      (convert-standard-filename file)))
 		   t t cmd)))
+      ;; Replace "%1", "%2" etc. in command with group matches from regex
+      (save-match-data
+	(let ((match-index 1)
+	      (number-of-groups (- (/ (length link-match-data) 2) 1)))
+	  (set-match-data link-match-data)
+	  (while (<= match-index number-of-groups)
+	    (let ((regex (concat "%" (number-to-string match-index)))
+		  (replace-with (match-string match-index dlink)))
+	      (while (string-match regex cmd)
+		(setq cmd (replace-match replace-with t t cmd))))
+	    (setq match-index (+ match-index 1)))))
+
       (save-window-excursion
 	(start-process-shell-command cmd nil cmd)
 	(and (boundp 'org-wait) (numberp org-wait) (sit-for org-wait))
@@ -9047,7 +9150,9 @@ If the file does not exist, an error is thrown."
 	(if search (org-link-search search))))
      ((consp cmd)
       (let ((file (convert-standard-filename file)))
-	(eval cmd)))
+	(save-match-data
+	  (set-match-data link-match-data)
+	  (eval cmd))))
      (t (funcall (cdr (assq 'file org-link-frame-setup)) file)))
     (and (org-mode-p) (eq old-mode 'org-mode)
 	 (or (not (equal old-buffer (current-buffer)))
@@ -9077,7 +9182,8 @@ be opened in Emacs."
 		       nil
 		     (if (string-match "\\W" (car x))
 			 x
-		       (cons (concat "\\." (car x) "\\'") (cdr x)))))
+		       (cons (concat "\\." (car x) "\\(::.*\\)?\\'")
+			     (cdr x)))))
 		 list))
    (if add-auto-mode
        (mapcar (lambda (x) (cons (car x) 'emacs)) auto-mode-alist))))
@@ -9415,6 +9521,11 @@ See also `org-refile-use-outline-path' and `org-completion-use-ido'"
 		    (or (outline-next-heading) (goto-char (point-max)))))
 		(if (not (bolp)) (newline))
 		(org-paste-subtree level)
+		(when org-log-refile
+		  (org-add-log-setup 'refile nil nil 'findpos
+				     org-log-refile)
+		  (unless (eq org-log-refile 'note)
+		    (save-excursion (org-add-log-note))))
 		(and org-auto-align-tags (org-set-tags nil t))
 		(bookmark-set "org-refile-last-stored")
 		(if (fboundp 'deactivate-mark) (deactivate-mark))
@@ -9478,15 +9589,19 @@ See also `org-refile-use-outline-path' and `org-completion-use-ido'"
 	    (if (equal (car org-refile-history) (nth 1 org-refile-history))
 		(pop org-refile-history)))
 	  pa)
-      (when (string-match "\\`\\(.*\\)/\\([^/]+\\)\\'" answ)
-	(setq parent (match-string 1 answ)
-	      child (match-string 2 answ))
-	(setq parent-target (or (assoc parent tbl) (assoc (concat parent "/") tbl)))
-	(when (and parent-target
-		   (or (eq new-nodes t)
-		       (and (eq new-nodes 'confirm)
-			    (y-or-n-p (format "Create new node \"%s\"? " child)))))
-	  (org-refile-new-child parent-target child))))))
+      (if (string-match "\\`\\(.*\\)/\\([^/]+\\)\\'" answ)
+	  (progn
+	    (setq parent (match-string 1 answ)
+		  child (match-string 2 answ))
+	    (setq parent-target (or (assoc parent tbl)
+				    (assoc (concat parent "/") tbl)))
+	    (when (and parent-target
+		       (or (eq new-nodes t)
+			   (and (eq new-nodes 'confirm)
+				(y-or-n-p (format "Create new node \"%s\"? "
+						  child)))))
+	      (org-refile-new-child parent-target child)))
+	(error "Invalid target location")))))
 
 (defun org-refile-new-child (parent-target child)
   "Use refile target PARENT-TARGET to add new CHILD below it."
@@ -9611,16 +9726,15 @@ the property list including an extra property :name with the block name."
 (defun org-map-dblocks (&optional command)
   "Apply COMMAND to all dynamic blocks in the current buffer.
 If COMMAND is not given, use `org-update-dblock'."
-  (let ((cmd (or command 'org-update-dblock))
-	pos)
+  (let ((cmd (or command 'org-update-dblock)))
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward org-dblock-start-re nil t)
-	(goto-char (setq pos (match-beginning 0)))
-	(condition-case nil
-	    (funcall cmd)
-	  (error (message "Error during update of dynamic block")))
-	(goto-char pos)
+	(goto-char (match-beginning 0))
+        (save-excursion
+          (condition-case nil
+              (funcall cmd)
+            (error (message "Error during update of dynamic block"))))
 	(unless (re-search-forward org-dblock-end-re nil t)
 	  (error "Dynamic block not terminated"))))))
 
@@ -10724,7 +10838,10 @@ With argument REMOVE, remove any deadline from the item.
 When TIME is set, it should be an internal time specification, and the
 scheduling will use the corresponding date."
   (interactive "P")
-  (let ((old-date (org-entry-get nil "DEADLINE")))
+  (let* ((old-date (org-entry-get nil "DEADLINE"))
+	 (repeater (and old-date
+			(string-match "\\([.+]+[0-9]+[dwmy]\\) ?" old-date)
+			(match-string 1 old-date))))
     (if remove
 	(progn
 	  (when (and old-date org-log-redeadline)
@@ -10732,15 +10849,26 @@ scheduling will use the corresponding date."
 			       org-log-redeadline))
 	  (org-remove-timestamp-with-keyword org-deadline-string)
 	  (message "Item no longer has a deadline."))
-      (if (org-get-repeat org-deadline-string)
-	  (error "Cannot change deadline on task with repeater, please do that by hand")
-	(org-add-planning-info 'deadline time 'closed)
-	(when (and old-date org-log-redeadline
-		   (not (equal old-date
-			       (substring org-last-inserted-timestamp 1 -1))))
-	  (org-add-log-setup 'redeadline nil old-date 'findpos
-			     org-log-redeadline))
-	(message "Deadline on %s" org-last-inserted-timestamp)))))
+      (org-add-planning-info 'deadline time 'closed)
+      (when (and old-date org-log-redeadline
+		 (not (equal old-date
+			     (substring org-last-inserted-timestamp 1 -1))))
+	(org-add-log-setup 'redeadline nil old-date 'findpos
+			   org-log-redeadline))
+      (when repeater
+	(save-excursion
+	  (org-back-to-heading t)
+	  (when (re-search-forward (concat org-deadline-string " "
+					   org-last-inserted-timestamp)
+				   (save-excursion
+				     (outline-next-heading) (point)) t)
+	    (goto-char (1- (match-end 0)))
+	    (insert " " repeater)
+	    (setq org-last-inserted-timestamp
+		  (concat (substring org-last-inserted-timestamp 0 -1)
+			  " " repeater
+			  (substring org-last-inserted-timestamp -1))))))
+      (message "Deadline on %s" org-last-inserted-timestamp))))
 
 (defun org-schedule (&optional remove time)
   "Insert the SCHEDULED: string with a timestamp to schedule a TODO item.
@@ -10748,7 +10876,10 @@ With argument REMOVE, remove any scheduling date from the item.
 When TIME is set, it should be an internal time specification, and the
 scheduling will use the corresponding date."
   (interactive "P")
-  (let ((old-date (org-entry-get nil "SCHEDULED")))
+  (let* ((old-date (org-entry-get nil "SCHEDULED"))
+	 (repeater (and old-date
+			(string-match "\\([.+]+[0-9]+[dwmy]\\) ?" old-date)
+			(match-string 1 old-date))))
     (if remove
 	(progn
 	  (when (and old-date org-log-reschedule)
@@ -10756,15 +10887,26 @@ scheduling will use the corresponding date."
 			       org-log-reschedule))
 	  (org-remove-timestamp-with-keyword org-scheduled-string)
 	  (message "Item is no longer scheduled."))
-      (if (org-get-repeat org-scheduled-string)
-	  (error "Cannot reschedule task with repeater, please do that by hand")
-	(org-add-planning-info 'scheduled time 'closed)
-	(when (and old-date org-log-reschedule
-		   (not (equal old-date
-			       (substring org-last-inserted-timestamp 1 -1))))
-	  (org-add-log-setup 'reschedule nil old-date 'findpos
-			     org-log-reschedule))
-	(message "Scheduled to %s" org-last-inserted-timestamp)))))
+      (org-add-planning-info 'scheduled time 'closed)
+      (when (and old-date org-log-reschedule
+		 (not (equal old-date
+			     (substring org-last-inserted-timestamp 1 -1))))
+	(org-add-log-setup 'reschedule nil old-date 'findpos
+			   org-log-reschedule))
+      (when repeater
+	(save-excursion
+	  (org-back-to-heading t)
+	  (when (re-search-forward (concat org-scheduled-string " "
+					   org-last-inserted-timestamp)
+				   (save-excursion
+				     (outline-next-heading) (point)) t)
+	    (goto-char (1- (match-end 0)))
+	    (insert " " repeater)
+	    (setq org-last-inserted-timestamp
+		  (concat (substring org-last-inserted-timestamp 0 -1)
+			  " " repeater
+			  (substring org-last-inserted-timestamp -1))))))
+      (message "Scheduled to %s" org-last-inserted-timestamp))))
 
 (defun org-get-scheduled-time (pom &optional inherit)
   "Get the scheduled time as a time tuple, of a format suitable
@@ -11014,6 +11156,8 @@ EXTRA is additional text that will be inserted into the notes buffer."
 		      "changing deadline")
 		     ((eq org-log-note-purpose 'deldeadline)
 		      "removing deadline")
+		     ((eq org-log-note-purpose 'refile)
+		      "refiling")
 		     ((eq org-log-note-purpose 'note)
 		      "this entry")
 		     (t (error "This should not happen")))))
@@ -11217,6 +11361,9 @@ How much context is shown depends upon the variables
 	    (org-flag-heading nil)
 	    (when siblings-p (org-show-siblings))))))))
 
+(defvar org-reveal-start-hook nil
+  "Hook run before revealing a location.")
+
 (defun org-reveal (&optional siblings)
   "Show current entry, hierarchy above it, and the following headline.
 This can be used to show a consistent set of context around locations
@@ -11229,6 +11376,7 @@ look like when opened with hierarchical calls to `org-cycle'.
 With double optional argument `C-u C-u', go to the parent and show the
 entire tree."
   (interactive "P")
+  (run-hooks 'org-reveal-start-hook)
   (let ((org-show-hierarchy-above t)
 	(org-show-following-heading t)
 	(org-show-siblings (if siblings t org-show-siblings)))
@@ -12437,7 +12585,7 @@ Being in this list makes sure that they are offered for completion.")
   "Regular expression matching the first line of a property drawer.")
 
 (defconst org-property-end-re "^[ \t]*:END:[ \t]*$"
-  "Regular expression matching the first line of a property drawer.")
+  "Regular expression matching the last line of a property drawer.")
 
 (defconst org-clock-drawer-start-re "^[ \t]*:CLOCK:[ \t]*$"
   "Regular expression matching the first line of a property drawer.")
@@ -12514,13 +12662,16 @@ allowed value."
     (message "%s is now %s" prop val)))
 
 (defun org-at-property-p ()
-  "Is the cursor in a property line?"
-  ;; FIXME: Does not check if we are actually in the drawer.
-  ;; FIXME: also returns true on any drawers.....
-  ;; This is used by C-c C-c for property action.
+  "Is cursor inside a property drawer?"
   (save-excursion
     (beginning-of-line 1)
-    (looking-at (org-re "^[ \t]*\\(:\\([[:alpha:]][[:alnum:]_-]*\\):\\)[ \t]*\\(.*\\)"))))
+    (when (looking-at (org-re "^[ \t]*\\(:\\([[:alpha:]][[:alnum:]_-]*\\):\\)[ \t]*\\(.*\\)"))
+     (let ((match (match-data)) ;; Keep match-data for use by calling
+	   (p (point))          ;; procedures.
+	   (range (unless (org-before-first-heading-p)
+		    (org-get-property-block))))
+       (prog1 (and range (<= (car range) p) (< p (cdr range)))
+	 (set-match-data match))))))
 
 (defun org-get-property-block (&optional beg end force)
   "Return the (beg . end) range of the body of the property drawer.
@@ -12959,18 +13110,17 @@ in the current file."
 					  keys)))
 		      prop0)))
 	  (cur (org-entry-get nil prop))
+	  (prompt (concat prop " value"
+			  (if (and cur (string-match "\\S-" cur))
+			      (concat " [" cur "]") "") ": "))
 	  (allowed (org-property-get-allowed-values nil prop 'table))
 	  (existing (mapcar 'list (org-property-values prop)))
 	  (val (if allowed
-		   (org-completing-read "Value: " allowed nil
+		   (org-completing-read prompt allowed nil
 		      (not (get-text-property 0 'org-unrestricted
 					      (caar allowed))))
 		 (let (org-completion-use-ido org-completion-use-iswitchb)
-		   (org-completing-read
-		    (concat "Value" (if (and cur (string-match "\\S-" cur))
-					(concat " [" cur "]") "")
-			    ": ")
-		    existing nil nil "" nil cur)))))
+		   (org-completing-read prompt existing nil nil "" nil cur)))))
      (list prop (if (equal val "") cur val))))
   (unless (equal (org-entry-get nil property) value)
     (org-entry-put nil property value)))
@@ -12979,8 +13129,7 @@ in the current file."
   "In the current entry, delete PROPERTY."
   (interactive
    (let* ((completion-ignore-case t)
-	  (prop (org-icompleting-read
-		 "Property: " (org-entry-properties nil 'standard))))
+	  (prop (org-icompleting-read "Property: " (org-entry-properties nil 'standard))))
      (list prop)))
   (message "Property %s %s" property
 	   (if (org-entry-delete nil property)
@@ -14561,8 +14710,11 @@ the buffer and restores the previous window configuration."
   (when (stringp org-agenda-files)
     (with-temp-buffer
       (insert-file-contents org-agenda-files)
-      (org-split-string (buffer-string) "[ \t\r\n]*?[\r\n][ \t\r\n]*"))))
-
+      (mapcar
+       (lambda (f)
+	 (expand-file-name (substitute-in-file-name f)
+			   (file-name-directory org-agenda-files)))
+       (org-split-string (buffer-string) "[ \t\r\n]*?[\r\n][ \t\r\n]*")))))
 
 ;;;###autoload
 (defun org-cycle-agenda-files ()
@@ -15978,7 +16130,8 @@ This command does many different things, depending on context:
 	   (fboundp org-finish-function))
       (funcall org-finish-function))
      ((run-hook-with-args-until-success 'org-ctrl-c-ctrl-c-hook))
-     ((org-at-property-p)
+     ((or (looking-at (org-re org-property-start-re))
+	  (org-at-property-p))
       (call-interactively 'org-property-action))
      ((org-on-target-p) (call-interactively 'org-update-radio-target-regexp))
      ((and (org-in-regexp "\\[\\([0-9]*%\\|[0-9]*/[0-9]*\\)\\]")
@@ -17011,6 +17164,17 @@ really on, so that the block visually is on the match."
 	      (throw 'exit t)))
 	nil))))
 
+(defun org-in-regexps-block-p (start-re end-re)
+  "Returns t if the current point is between matches of START-RE and END-RE.
+This will also return to if point is on one of the two matches."
+  (interactive)
+  (let ((p (point)))
+    (save-excursion
+      (and (or (org-at-regexp-p start-re)
+	       (re-search-backward start-re nil t))
+	   (re-search-forward end-re nil t)
+	   (>= (point) p)))))
+
 (defun org-occur-in-agenda-files (regexp &optional nlines)
   "Call `multi-occur' with buffers for all agenda files."
   (interactive "sOrg-files matching: \np")
@@ -17317,6 +17481,12 @@ which make use of the date at the cursor."
 		       t t))
     (org-move-to-column column)))
 
+(defvar org-adaptive-fill-regexp-backup adaptive-fill-regexp
+  "Variable to store copy of `adaptive-fill-regexp'.
+Since `adaptive-fill-regexp' is set to never match, we need to
+store a backup of its value before entering `org-mode' so that
+the functionality can be provided as a fall-back.")
+
 (defun org-set-autofill-regexps ()
   (interactive)
   ;; In the paragraph separator we include headlines, because filling
@@ -17352,8 +17522,11 @@ which make use of the date at the cursor."
   ;; and fixed-width regions are not wrapped.  That function will pass
   ;; through to `fill-paragraph' when appropriate.
   (org-set-local 'fill-paragraph-function 'org-fill-paragraph)
-  ; Adaptive filling: To get full control, first make sure that
+  ;; Adaptive filling: To get full control, first make sure that
   ;; `adaptive-fill-regexp' never matches.  Then install our own matcher.
+  (unless (local-variable-p 'adaptive-fill-regexp)
+    (org-set-local 'org-adaptive-fill-regexp-backup
+                   adaptive-fill-regexp))
   (org-set-local 'adaptive-fill-regexp "\000")
   (org-set-local 'adaptive-fill-function
 		 'org-adaptive-fill-function)
@@ -17382,8 +17555,11 @@ which make use of the date at the cursor."
   "Return a fill prefix for org-mode files.
 In particular, this makes sure hanging paragraphs for hand-formatted lists
 work correctly."
-  (cond ((looking-at "#[ \t]+")
-	 (match-string 0))
+  (cond
+   ;; Comment line
+   ((looking-at "#[ \t]+")
+    (match-string-no-properties 0))
+   ;; Description list
 	((looking-at "[ \t]*\\([-*+] .*? :: \\)")
 	 (save-excursion
 	   (if (> (match-end 1) (+ (match-beginning 1)
@@ -17391,11 +17567,14 @@ work correctly."
 	       (goto-char (+ (match-beginning 1) 5))
 	     (goto-char (match-end 0)))
 	   (make-string (current-column) ?\ )))
-	((looking-at "[ \t]*\\([-*+] \\|[0-9]+[.)]  ?\\)?")
+    ;; Ordered or unordered list
+	((looking-at "[ \t]*\\([-*+] \\|[0-9]+[.)]  ?\\)")
 	 (save-excursion
 	   (goto-char (match-end 0))
 	   (make-string (current-column) ?\ )))
-	(t nil)))
+    ;; Other text
+    ((looking-at org-adaptive-fill-regexp-backup)
+     (match-string-no-properties 0))))
 
 ;;; Other stuff.
 
@@ -17736,6 +17915,15 @@ interactive command with similar behavior."
 (defun org-at-heading-p (&optional ignored)
   (outline-on-heading-p t))
 
+(defun org-point-at-end-of-empty-headline ()
+  "If point is at the end of an empty headline, return t, else nil.
+If the heading only contains a TODO keyword, it is still still considered
+empty."
+  (and (looking-at "[ \t]*$")
+       (save-excursion
+         (beginning-of-line 1)
+         (looking-at (concat "^\\(\\*+\\)[ \t]+\\(" org-todo-regexp
+			     "\\)?[ \t]*$")))))
 (defun org-at-heading-or-item-p ()
   (or (org-on-heading-p) (org-at-item-p)))
 

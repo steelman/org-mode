@@ -1005,6 +1005,47 @@ This actually throws an error, so it aborts the current command."
 (defvar org-table-clip nil
   "Clipboard for table regions.")
 
+(defun org-table-get (line column)
+  "Get the field in table line LINE, column COLUMN.
+If LINE is larger than the number of data lines in the table, the function
+returns nil.  However, if COLUMN is too large, we will simply return an
+empty string.
+If LINE is nil, use the current line.
+If column is nil, use the current column."
+  (setq column (or column (org-table-current-column)))
+  (save-excursion
+    (and (or (not line) (org-table-goto-line line))
+	 (org-trim (org-table-get-field column)))))
+
+(defun org-table-put (line column value &optional align)
+  "Put VALUE into line LINE, column COLUMN.
+When ALIGN is set, als realign the table."
+  (setq column (or column (org-table-current-column)))
+  (prog1 (save-excursion
+	   (and (or (not line) (org-table-goto-line line))
+		(progn (org-table-goto-column column nil 'force) t)
+		(org-table-get-field column value)))
+    (and align (org-table-align))))
+  
+(defun org-table-current-line ()
+  "Return the index of the current data line."
+  (let ((pos (point)) (end (org-table-end)) (cnt 0)) 
+    (save-excursion
+      (goto-char (org-table-begin))
+      (while (and (re-search-forward org-table-dataline-regexp end t)
+		  (setq cnt (1+ cnt))
+		  (< (point-at-eol) pos))))
+    cnt))
+
+(defun org-table-goto-line (N)
+  "Go to the Nth data line in the current table.
+Return t when the line exists, nil if it does not exist."
+  (goto-char (org-table-begin))
+  (let ((end (org-table-end)) (cnt 0))
+    (while (and (re-search-forward org-table-dataline-regexp end t)
+		(< (setq cnt (1+ cnt)) line)))
+    (= cnt line)))
+
 (defun org-table-blank-field ()
   "Blank the current table field or active region."
   (interactive)
@@ -1104,22 +1145,20 @@ of the field.
 If there are less than N fields, just go to after the last delimiter.
 However, when FORCE is non-nil, create new columns if necessary."
   (interactive "p")
-  (let ((pos (point-at-eol)))
-    (beginning-of-line 1)
-    (when (> n 0)
-      (while (and (> (setq n (1- n)) -1)
-		  (or (search-forward "|" pos t)
-		      (and force
-			   (progn (end-of-line 1)
-				  (skip-chars-backward "^|")
-				  (insert " | "))))))
-;                                  (backward-char 2) t)))))
-      (when (and force (not (looking-at ".*|")))
-	(save-excursion (end-of-line 1) (insert " | ")))
-      (if on-delim
-	  (backward-char 1)
-	(if (looking-at " ") (forward-char 1))))))
-
+  (beginning-of-line 1)
+  (when (> n 0)
+    (while (and (> (setq n (1- n)) -1)
+		(or (search-forward "|" (point-at-eol) t)
+		    (and force
+			 (progn (end-of-line 1)
+				(skip-chars-backward "^|")
+				(insert " | ")
+				t)))))
+    (when (and force (not (looking-at ".*|")))
+      (save-excursion (end-of-line 1) (insert " | ")))
+    (if on-delim
+	(backward-char 1)
+      (if (looking-at " ") (forward-char 1)))))
 
 (defun org-table-insert-column ()
   "Insert a new column into the table."
@@ -2245,6 +2284,20 @@ not overwrite the stored one."
 	(setq form (copy-sequence formula)
 	      lispp (and (> (length form) 2)(equal (substring form 0 2) "'(")))
 	(if (and lispp literal) (setq lispp 'literal))
+
+	;; Insert row and column number of formula result field
+	(while (string-match "[@$]#" form)
+	  (setq form
+		(replace-match
+		 (format "%d"
+			 (save-match-data
+			   (if (equal (substring form (match-beginning 0)
+						 (1+ (match-beginning 0)))
+				      "@")
+			       (org-table-current-dline)
+			     (org-table-current-column))))
+		 t t form)))
+
 	;; Check for old vertical references
 	(setq form (org-table-rewrite-old-row-references form))
 	;; Insert remote references
@@ -2798,6 +2851,12 @@ full TBLFM line."
 	     (equal ?. (aref s (max (1- (match-beginning 0)) 0)))
 	     (not (equal ?. (aref s (max (- (match-beginning 0) 2) 0)))))
 	;; 3.e5 or something like this.
+	(setq start (match-end 0)))
+       ((or (> (- (match-end 1) (match-beginning 1)) 2)
+	    ;; (member (match-string 1 s)
+	    ;;	    '("arctan" "exp" "expm" "lnp" "log" "stir"))
+	    )
+	;; function name, just advance
 	(setq start (match-end 0)))
        (t
 	(setq start (match-beginning 0)

@@ -1142,7 +1142,8 @@ The function mus take one parameter, the depth of the table of contents.")
 TITLE is the current title from the buffer or region.
 OPT-PLIST is the options plist for current buffer."
   (let ((toc (plist-get opt-plist :table-of-contents))
-	(author (plist-get opt-plist :author)))
+	(author (org-export-apply-macros-in-string
+		 (plist-get opt-plist :author))))
     (concat
      (if (plist-get opt-plist :time-stamp-file)
 	 (format-time-string "%% Created %Y-%m-%d %a %H:%M\n"))
@@ -1176,7 +1177,7 @@ OPT-PLIST is the options plist for current buffer."
 	 (format "\\author{%s}\n"
 		 (org-export-latex-fontify-headline (or author user-full-name)))
        (format "%%\\author{%s}\n"
-	       (or author user-full-name)))
+	       (org-export-latex-fontify-headline (or author user-full-name))))
      ;; insert the date
      (format "\\date{%s}\n"
 	     (format-time-string
@@ -1330,7 +1331,9 @@ links, keywords, lists, tables, fixed-width"
 		      "\\(?:<[^<>\n]*>\\)*"
 		      "\\(?:\\[[^][\n]*?\\]\\)*"
 		      "\\(?:<[^<>\n]*>\\)*"
-		      (org-create-multibrace-regexp "{" "}" 3))))
+		      "\\("
+		      (org-create-multibrace-regexp "{" "}" 3)
+		      "\\)\\{1,3\\}")))
       (while (re-search-forward re nil t)
 	(unless (save-excursion (goto-char (match-beginning 0))
 				(equal (char-after (point-at-bol)) ?#))
@@ -1428,7 +1431,7 @@ See the `org-export-latex.el' code for a complete conversion table."
 		       (backward-char 1)))))))
 	'(;"^\\([^\n$]*?\\|^\\)\\(\\\\?\\$\\)\\([^\n$]*\\)$"
 	  "\\(\\(\\\\?\\$\\)\\)"
-	  "\\([a-za-z0-9]+\\|[ \t\n]\\|\\b\\|\\\\\\)\\(_\\|\\^\\)\\({[^{}]+}\\|[a-za-z0-9]+\\|[ \t\n]\\|[:punct:]\\|)\\|{[a-za-z0-9]+}\\|([a-za-z0-9]+)\\)"
+	  "\\([a-za-z0-9()]+\\|[ \t\n]\\|\\b\\|\\\\\\)\\(_\\|\\^\\)\\({[^{}]+}\\|[a-za-z0-9]+\\|[ \t\n]\\|[:punct:]\\|)\\|{[a-za-z0-9]+}\\|([a-za-z0-9]+)\\)"
 	  "\\(.\\|^\\)\\(\\\\\\)\\([ \t\n]\\|[a-zA-Z&#%{}\"]+\\)"
 	  "\\(.\\|^\\)\\(&\\)"
 	  "\\(.\\|^\\)\\(#\\)"
@@ -1514,9 +1517,9 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 			   (match-string 0)) t t)
     (save-excursion
       (beginning-of-line 1)
-      (unless (looking-at ".*\\\\newline[ \t]*$")
+      (unless (looking-at ".*\n[ \t]*\n")
 	(end-of-line 1)
-	(insert "\\newline")))))
+	(insert "\n")))))
 
 (defun org-export-latex-fixed-width (opt)
   "When OPT is non-nil convert fixed-width sections to LaTeX."
@@ -1733,7 +1736,10 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 		    (save-match-data
 		      (and (org-at-table-p)
 			   (string-match
-			    "[|\n]" (buffer-substring beg end))))))
+			    "[|\n]" (buffer-substring beg end)))))
+		  (and (equal (match-string 3) "+")
+		       (save-match-data
+			 (string-match "\\`-+\\'" (match-string 4)))))
 	(setq s (match-string 4))
 	(setq rpl (concat (match-string 1)
 			  (org-export-latex-emph-format (cadr emph)
@@ -2125,7 +2131,8 @@ The conversion is made depending of STRING-BEFORE and STRING-AFTER."
 (defun org-export-latex-fix-inputenc ()
   "Set the codingsystem in inputenc to what the buffer is."
   (let* ((cs buffer-file-coding-system)
-	 (opt (or (latexenc-coding-system-to-inputenc cs) "utf8")))
+	 (opt (or (ignore-errors (latexenc-coding-system-to-inputenc cs))
+		  "utf8")))
     (when opt
       ;; Translate if that is requested
       (setq opt (or (cdr (assoc opt org-export-latex-inputenc-alist)) opt))

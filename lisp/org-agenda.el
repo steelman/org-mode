@@ -258,6 +258,13 @@ you can \"misuse\" it to also add other text to the header.  However,
 		   (const :format "" quote)
 		   (repeat
 		    (string :tag "+tag or -tag"))))
+	    (list :tag "Set daily/weekly entry types"
+		  (const org-agenda-entry-types)
+		  (set :greedy t :value (:deadline :scheduled :timestamp :sexp)
+		       (const :deadline)
+		       (const :scheduled)
+		       (const :timestamp)
+		       (const :sexp)))
 	    (list :tag "Standard skipping condition"
 		  :value (org-agenda-skip-function '(org-agenda-skip-entry-if))
 		  (const org-agenda-skip-function)
@@ -273,6 +280,24 @@ you can \"misuse\" it to also add other text to the header.  However,
 			     :tag "Condition type"
 			     (list :tag "Regexp matches" :inline t (const :format "" 'regexp) (regexp))
 			     (list :tag "Regexp does not match" :inline t (const :format "" 'notregexp) (regexp))
+			     (list :tag "TODO state is" :inline t
+				   (const 'todo)
+				   (choice
+				    (const :tag "any not-done state" 'todo)
+				    (const :tag "any done state" 'done)
+				    (const :tag "any state" 'any)
+				    (list :tag "Keyword list"
+					  (const :format "" quote)
+					  (repeat (string :tag "Keyword")))))
+			     (list :tag "TODO state is not" :inline t
+				   (const 'nottodo)
+				   (choice
+				    (const :tag "any not-done state" 'todo)
+				    (const :tag "any done state" 'done)
+				    (const :tag "any state" 'any)
+				    (list :tag "Keyword list"
+					  (const :format "" quote)
+					  (repeat (string :tag "Keyword")))))
 			     (const :tag "scheduled" 'scheduled)
 			     (const :tag "not scheduled" 'notscheduled)
 			     (const :tag "deadline" 'deadline)
@@ -562,6 +587,8 @@ to make his option also apply to the tags-todo list."
 
 (defcustom org-agenda-todo-ignore-deadlines nil
   "Non-nil means ignore some deadlined TODO items when making TODO list.
+There are different motivations for using different values, please think
+carefully when configuring this variable.
 
 This applie when creating the global todo list.
 Valid values are:
@@ -570,8 +597,14 @@ near    Don't show near deadline entries.  A deadline is near when it is
         closer than `org-deadline-warning-days' days.  The idea behind this
         is that such items will appear in the agenda anyway.
 
-far     Don't show far deadline entries.  This is useful if you don't want
-        to use the todo list to figure out what to do now.
+far     Don't show TODO entries where a deadline has been defined, but
+        the deadline is not near.  This is useful if you don't want to
+        use the todo list to figure out what to do now.
+
+past    Don't show entries with a deadline timestamp for today or in the past.
+
+future  Don't show entries with a deadline timestamp in the future, not even
+        when they become `near' ones.  Use it with caution.
 
 past    Don't show entries with a deadline timestamp for today or in the past.
 
@@ -888,6 +921,12 @@ and timeline buffers."
 
 (defcustom org-agenda-include-diary nil
   "If non-nil, include in the agenda entries from the Emacs Calendar's diary.
+Custom commands can set this variable in the options section."
+  :group 'org-agenda-daily/weekly
+  :type 'boolean)
+
+(defcustom org-agenda-include-deadlines t
+  "If non-nil, include entries within their deadline warning period.
 Custom commands can set this variable in the options section."
   :group 'org-agenda-daily/weekly
   :type 'boolean)
@@ -1565,6 +1604,7 @@ The following commands are available:
 (org-defkey org-agenda-mode-map "l" 'org-agenda-log-mode)
 (org-defkey org-agenda-mode-map "v" 'org-agenda-view-mode-dispatch)
 (org-defkey org-agenda-mode-map "D" 'org-agenda-toggle-diary)
+(org-defkey org-agenda-mode-map "!" 'org-agenda-toggle-deadlines)
 (org-defkey org-agenda-mode-map "G" 'org-agenda-toggle-time-grid)
 (org-defkey org-agenda-mode-map "r" 'org-agenda-redo)
 (org-defkey org-agenda-mode-map "g" 'org-agenda-redo)
@@ -1664,6 +1704,9 @@ The following commands are available:
      "--"
      ["Include Diary" org-agenda-toggle-diary
       :style toggle :selected org-agenda-include-diary
+      :active (org-agenda-check-type nil 'agenda)]
+     ["Include Deadlines" org-agenda-toggle-deadlines
+      :style toggle :selected org-agenda-include-deadlines
       :active (org-agenda-check-type nil 'agenda)]
      ["Use Time Grid" org-agenda-toggle-time-grid
       :style toggle :selected org-agenda-use-time-grid
@@ -3094,6 +3137,39 @@ When EMPTY is non-nil, also include days without any entries."
 (defvar org-agenda-span nil) ; local variable in the agenda buffer
 (defvar org-include-all-loc nil) ; local variable
 
+(defvar org-agenda-entry-types '(:deadline :scheduled :timestamp :sexp)
+  "List of types searched for when creating the daily/weekly agenda.
+This variable is a list of symbols that controls the types of
+items that appear in the daily/weekly agenda.  Allowed symbols in this
+list are are
+
+   :timestamp    List items containing a date stamp or date range matching
+                 the selected date.  This includes sexp entries in
+                 angular brackets.
+
+   :sexp         List entries resulting from plain diary-like sexps.
+
+   :deadline     List deadline due on that date.  When the date is today,
+                 also list any deadlines past due, or due within
+		 `org-deadline-warning-days'.  `:deadline' must appear before
+                 `:scheduled' if the setting of
+                 `org-agenda-skip-scheduled-if-deadline-is-shown' is to have
+                 any effect.
+
+   :scheduled    List all items which are scheduled for the given date.
+		 The diary for *today* also contains items which were
+		 scheduled earlier and are not yet marked DONE.
+
+By default, all four types are turned on.
+
+Never set this variable globally using `setq', because then it
+will apply to all future agenda commands.  Instead, bind it with
+`let' to scope it dynamically into the the agenda-constructing
+command.  A good way to set it is through options in
+`org-agenda-custom-commands'.  For a more flexible (though
+somewhat less efficient) way of determining what is included in
+the daily/weekly agenda, see `org-agenda-skip-function'.")
+
 ;;;###autoload
 (defun org-agenda-list (&optional include-all start-day ndays)
   "Produce a daily/weekly view from all files in variable `org-agenda-files'.
@@ -3217,18 +3293,22 @@ given in `org-agenda-start-on-weekday'."
       (while (setq file (pop files))
 	(catch 'nextfile
 	  (org-check-agenda-file file)
-	  (cond
-	   ((eq org-agenda-show-log 'only)
-	    (setq rtn (org-agenda-get-day-entries
-		       file date :closed)))
-	   (org-agenda-show-log
-	    (setq rtn (org-agenda-get-day-entries
-		       file date
-		       :deadline :scheduled :timestamp :sexp :closed)))
-	   (t
-	    (setq rtn (org-agenda-get-day-entries
-		       file date
-		       :deadline :scheduled :sexp :timestamp))))
+	  (let ((org-agenda-entry-types org-agenda-entry-types))
+	    (unless org-agenda-include-deadlines
+	      (setq org-agenda-entry-types
+		    (delq :deadline org-agenda-entry-types)))
+	    (cond
+	     ((eq org-agenda-show-log 'only)
+	      (setq rtn (org-agenda-get-day-entries
+			 file date :closed)))
+	     (org-agenda-show-log
+	      (setq rtn (apply 'org-agenda-get-day-entries
+			       file date
+			       (append '(:closed) org-agenda-entry-types))))
+	     (t
+	      (setq rtn (apply 'org-agenda-get-day-entries
+			       file date
+			       org-agenda-entry-types)))))
 	  (setq rtnall (append rtnall rtn))))
       (if org-agenda-include-diary
 	  (let ((org-agenda-search-headline-for-time t))
@@ -3765,17 +3845,17 @@ The regexp is taken from the conditions list, it must come right after
 the `regexp' or `notregexp' element.
 
 `todo' and `nottodo' accept as an argument a list of todo
-keywords, which may include ""*"" to match any todo keyword.
+keywords, which may include \"*\" to match any todo keyword.
 
-    (org-agenda-skip-entry-if 'todo '(""TODO"" ""WAITING""))
+    (org-agenda-skip-entry-if 'todo '(\"TODO\" \"WAITING\"))
 
-would skip all entries with ""TODO"" or ""WAITING"" keywords.
+would skip all entries with \"TODO\" or \"WAITING\" keywords.
 
 Instead of a list a keyword class may be given
 
     (org-agenda-skip-entry-if 'nottodo 'done)
 
-would skip entries that haven't been marked with any of ""DONE""
+would skip entries that haven't been marked with any of \"DONE\"
 keywords. Possible classes are: `todo', `done', `any'.
 
 If any of these conditions is met, this function returns the end point of
@@ -3815,7 +3895,10 @@ that can be put into `org-agenda-skip-function' for the duration of a command."
      end)))
 
 (defun org-agenda-skip-if-todo (args end)
-  "Helper function for org-agenda-skip-if, do not use it directly."
+  "Helper function for `org-agenda-skip-if', do not use it directly.
+ARGS is a list with first element either `todo' or `nottodo'.
+The remainder is either a list of TODO keywords, or a state symbol
+`todo' or `done' or `any'."
   (let ((kw (car args))
 	(arg (cadr args))
 	todo-wds todo-re)
@@ -4014,27 +4097,8 @@ Needed to avoid empty dates which mess up holiday display."
 This function can be used in a \"sexp\" diary entry in the Emacs calendar.
 It accesses org files and extracts information from those files to be
 listed in the diary.  The function accepts arguments specifying what
-items should be listed.  The following arguments are allowed:
-
-   :timestamp    List the headlines of items containing a date stamp or
-		 date range matching the selected date.  Deadlines will
-		 also be listed, on the expiration day.
-
-   :sexp         List entries resulting from diary-like sexps.
-
-   :deadline     List any deadlines past due, or due within
-		 `org-deadline-warning-days'.  The listing occurs only
-		 in the diary for *today*, not at any other date.  If
-		 an entry is marked DONE, it is no longer listed.
-
-   :scheduled    List all items which are scheduled for the given date.
-		 The diary for *today* also contains items which were
-		 scheduled earlier and are not yet marked DONE.
-
-   :todo         List all TODO items from the org-file.  This may be a
-		 long list - so this is not turned on by default.
-		 Like deadlines, these entries only show up in the
-		 diary for *today*, not at any other date.
+items should be listed.  For a list of arguments allowed here, see the
+variable `org-agenda-entry-types'.
 
 The call in the diary file should look like this:
 
@@ -5680,6 +5744,7 @@ With prefix ARG, go backward that many times the current span."
       ((?E ?e) (call-interactively 'org-agenda-entry-text-mode))
       (?G (call-interactively 'org-agenda-toggle-time-grid))
       (?D (call-interactively 'org-agenda-toggle-diary))
+      (?\! (call-interactively 'org-agenda-toggle-deadlines))
       (?\[ (let ((org-agenda-include-inactive-timestamps t))
 	     (org-agenda-check-type t 'timeline 'agenda)
 	     (org-agenda-redo))
@@ -5917,6 +5982,16 @@ When called with a prefix argument, include all archive files as well."
   (message "Diary inclusion turned %s"
 	   (if org-agenda-include-diary "on" "off")))
 
+(defun org-agenda-toggle-deadlines ()
+  "Toggle diary inclusion in an agenda buffer."
+  (interactive)
+  (org-agenda-check-type t 'agenda)
+  (setq org-agenda-include-deadlines (not org-agenda-include-deadlines))
+  (org-agenda-redo)
+  (org-agenda-set-mode-name)
+  (message "Deadlines inclusion turned %s"
+	   (if org-agenda-include-deadlines "on" "off")))
+
 (defun org-agenda-toggle-time-grid ()
   "Toggle time grid in an agenda buffer."
   (interactive)
@@ -5937,6 +6012,7 @@ When called with a prefix argument, include all archive files as well."
 		(if org-agenda-follow-mode     " Follow" "")
 		(if org-agenda-entry-text-mode " ETxt"   "")
 		(if org-agenda-include-diary   " Diary"  "")
+		(if org-agenda-include-deadlines " Ddl"  "")
 		(if org-agenda-use-time-grid   " Grid"   "")
 		(if (and (boundp 'org-habit-show-habits)
 			 org-habit-show-habits) " Habit"   "")
@@ -7006,6 +7082,11 @@ top-level    as top-level entries at the end of the file."
 	  (const :tag "in a date tree" date-tree)
 	  (const :tag "as top level at end of file" top-level)))
 
+(defcustom org-agenda-insert-diary-extract-time nil
+  "Non-nil means extract any time specification from the diary entry."
+  :group 'org-agenda
+  :type 'boolean)
+
 (defun org-agenda-add-entry-to-org-agenda-diary-file (type text &optional d1 d2)
   "Add a diary entry with TYPE to `org-agenda-diary-file'.
 If TEXT is not empty, it will become the headline of the new entry, and
@@ -7040,12 +7121,13 @@ the resulting entry will not be shown.  When TEXT is empty, switch to
 	(insert (format "%%%%(diary-anniversary %s) %s"
 			(calendar-date-string d1 nil t) text))))
      ((eq type 'day)
-      (let*
-	  (fmt time time2
-	       (org-agenda-time-leading-zero t))
-	(if org-agenda-search-headline-for-time
+      (let ((org-prefix-has-time t)
+	    (org-agenda-time-leading-zero t)
+	    fmt time time2)
+	(if org-agenda-insert-diary-extract-time
 	    ;; Use org-format-agenda-item to parse text for a time-range and
-	    ;; remove it.  
+	    ;; remove it.  FIXME: This is a hack, we should refactor
+	    ;; that function to make time extraction available separately
 	    (setq fmt (org-format-agenda-item nil text nil nil t)
 		  time (get-text-property 0 'time fmt)
 		  time2 (if (> (length time) 0)
@@ -7350,6 +7432,7 @@ The prefix arg is passed through to the command if possible."
     (error "No entries are marked"))
   (message "Bulk: [r]efile [$]archive [A]rch->sib [t]odo [+/-]tag [s]chedule [d]eadline")
   (let* ((action (read-char-exclusive))
+	 (org-log-refile (if org-log-refile 'time nil))
 	 (entries (reverse org-agenda-bulk-marked-entries))
 	 cmd rfloc state e tag pos (cnt 0) (cntskip 0))
     (cond

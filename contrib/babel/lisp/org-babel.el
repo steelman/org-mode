@@ -124,6 +124,8 @@ can not be resolved.")
 (defvar org-babel-hash-show 4
   "Number of initial characters to show of a hidden results hash.")
 
+(defvar org-babel-after-execute-hook nil
+  "Hook for functions to be called after `org-babel-execute-src-block'")
 (defun org-babel-named-src-block-regexp-for-name (name)
   "Regexp used to match named src block."
   (concat org-babel-source-name-regexp (regexp-quote name) "[ \t\n]*"
@@ -137,7 +139,7 @@ can not be resolved.")
 		"\\)[ \t]*"
 		"\\([^\":\n]*\"[^\"\n*]*\"[^\":\n]*\\|[^\":\n]*\\)" ;; (2)   switches
 		"\\([^\n]*\\)\n"                      ;; (3)   header arguments
-                "\\([^\000]+?\\)#\\+end_src"))        ;; (4)   body
+                "\\([^\000]+?\n\\)[ \t]*#\\+end_src"));; (4)   body
   (setq org-babel-inline-src-block-regexp
 	(concat "[ \f\t\n\r\v]\\(src_"                ;; (1)   replacement target
 		"\\("                                 ;; (2)   lang
@@ -240,6 +242,7 @@ block."
 			     (list (list result))
 			   result)))
 	(org-babel-insert-result result result-params info new-hash)
+	(run-hooks 'org-babel-after-execute-hook)
 	result))))
 
 (defun org-babel-load-in-session (&optional arg info)
@@ -258,17 +261,20 @@ session.  After loading the body this pops open the session."
     (pop-to-buffer (funcall (intern (concat "org-babel-load-session:" lang)) session body params))
     (move-end-of-line 1)))
 
-(defun org-babel-pop-to-session (&optional arg info)
-  "Pop to the session of the current source-code block.  If
-called with a prefix argument then evaluate the header arguments
-for the source block before entering the session.  Copy the body
+(defun org-babel-switch-to-session (&optional arg info)
+  "Switch to the session of the current source-code block.
+If called with a prefix argument then evaluate the header arguments
+for the source block before entering the session. Copy the body
 of the source block to the kill ring."
   (interactive)
   (let* ((info (or info (org-babel-get-src-block-info)))
          (lang (first info))
          (body (second info))
          (params (third info))
-         (session (cdr (assoc :session params))))
+         (session (cdr (assoc :session params)))
+	 (dir (cdr (assoc :dir params)))
+	 (default-directory
+	   (or (and dir (file-name-as-directory dir)) default-directory)))
     (unless (member lang org-babel-interpreters)
       (error "Language is not in `org-babel-interpreters': %s" lang))
     ;; copy body to the kill ring
@@ -276,8 +282,10 @@ of the source block to the kill ring."
     ;; if called with a prefix argument, then process header arguments
     (if arg (funcall (intern (concat "org-babel-prep-session:" lang)) session params))
     ;; just to the session using pop-to-buffer
-    (pop-to-buffer (funcall (intern (format "org-babel-%s-initiate-session" lang)) session))
+    (pop-to-buffer (funcall (intern (format "org-babel-%s-initiate-session" lang)) session params))
     (move-end-of-line 1)))
+
+(defalias 'org-babel-pop-to-session 'org-babel-switch-to-session)
 
 (defun org-babel-open-src-block-result (&optional re-run)
   "If `point' is on a src block then open the results of the
@@ -597,8 +605,8 @@ If the point is not on a source block then return nil."
             (point)))
      (save-excursion ;; inside a src block
        (and
-        (re-search-backward "#\\+begin_src" nil t) (setq top (point))
-        (re-search-forward "#\\+end_src" nil t) (setq bottom (point))
+        (re-search-backward "^[ \t]*#\\+begin_src" nil t) (setq top (point))
+        (re-search-forward "^[ \t]*#\\+end_src" nil t) (setq bottom (point))
         (< top initial) (< initial bottom)
         (goto-char top) (move-beginning-of-line 1)
         (looking-at org-babel-src-block-regexp)
@@ -648,7 +656,7 @@ following the source block."
 	   (head (unless on-lob-line (org-babel-where-is-src-block-head))) end)
       (when head (goto-char head))
       (or (and name (org-babel-find-named-result name))
-          (and (or on-lob-line (re-search-forward "#\\+end_src" nil t))
+          (and (or on-lob-line (re-search-forward "^[ \t]*#\\+end_src" nil t))
                (progn (move-end-of-line 1)
 		      (if (eobp) (insert "\n") (forward-char 1))
 		      (setq end (point))
@@ -1049,7 +1057,7 @@ This is taken almost directly from `org-read-prop'."
       (or (org-babel-number-p cell)
           (if (or (equal "(" (substring cell 0 1))
                   (equal "'" (substring cell 0 1)))
-              (read cell)
+              (eval (read cell))
             (progn (set-text-properties 0 (length cell) nil cell) cell)))
     cell))
 

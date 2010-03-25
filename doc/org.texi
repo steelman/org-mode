@@ -1390,7 +1390,15 @@ look inside the drawer, you need to move the cursor to the drawer line and
 press @key{TAB} there.  Org mode uses the @code{PROPERTIES} drawer for
 storing properties (@pxref{Properties and Columns}), and you can also arrange
 for state change notes (@pxref{Tracking TODO state changes}) and clock times
-(@pxref{Clocking work time}) to be stored in a drawer @code{LOGBOOK}.
+(@pxref{Clocking work time}) to be stored in a drawer @code{LOGBOOK}.  If you
+want to store a quick note in the LOGBOOK drawer, in a similar way as this is
+done by state changes, use
+
+@table @kbd
+@kindex C-c C-z
+@item C-c C-z
+Add a time-stamped note to the LOGBOOK drawer.
+@end table
 
 @node Blocks, Footnotes, Drawers, Document Structure
 @section Blocks
@@ -1928,11 +1936,13 @@ Orgtbl mode, including spreadsheet capabilities.  For details, see
 
 The table editor makes use of the Emacs @file{calc} package to implement
 spreadsheet-like capabilities.  It can also evaluate Emacs Lisp forms to
-derive fields from other fields.  While fully featured, Org's
-implementation is not identical to other spreadsheets.  For example,
-Org knows the concept of a @emph{column formula} that will be
-applied to all non-header fields in a column without having to copy the
-formula to each relevant field.
+derive fields from other fields.  While fully featured, Org's implementation
+is not identical to other spreadsheets.  For example, Org knows the concept
+of a @emph{column formula} that will be applied to all non-header fields in a
+column without having to copy the formula to each relevant field.  There is
+also a formula debugger, and a formula editor with features for highlighting
+fields in the table corresponding to the references at the point in the
+formula, moving these references by arrow keys
 
 @menu
 * References::                  How to refer to another field or range
@@ -2039,6 +2049,21 @@ into Calc vector functions.  Empty fields in ranges are normally
 suppressed, so that the vector contains only the non-empty fields (but
 see the @samp{E} mode switch below).  If there are no non-empty fields,
 @samp{[0]} is returned to avoid syntax errors in formulas.
+
+@subsubheading Field coordinates in formulas
+@cindex field coordinates
+@cindex coordinates, of field
+@cindex row, of field coordinates
+@cindex column, of field coordinates
+
+For Calc formulas and Lisp formulas @code{@@#} and @code{$#} can be used to
+get the row or column number of the field where the formula result goes.
+The traditional Lisp formula equivalents are @code{org-table-current-dline}
+and @code{org-table-current-column}.  Example:
+
+@example
+if(@@# % 2, $#, string(""))      @r{column number on odd lines only}
+@end example
 
 @subsubheading Named references
 @cindex named references
@@ -3091,6 +3116,7 @@ link, together with an explanation:
 [[file:~/code/main.c::255]]
 [[file:~/xx.org::My Target]]
 [[file:~/xx.org::*My Target]]
+[[file:~/xx.org::#my-custom-id]]
 [[file:~/xx.org::/regexp/]]
 @end example
 
@@ -3105,6 +3131,8 @@ link will become an HTML reference to the corresponding named anchor in
 the linked file.
 @item *My Target
 In an Org file, restrict search to headlines.
+@item #my-custom-id
+Link to a heading with a @code{CUSTOM_ID} property
 @item /regexp/
 Do a regular expression search for @code{regexp}.  This uses the Emacs
 command @code{occur} to list all matches in a separate window.  If the
@@ -4446,6 +4474,7 @@ used as keys in the properties drawer:
 @cindex property, special, TIMESTAMP
 @cindex property, special, TIMESTAMP_IA
 @cindex property, special, CLOCKSUM
+@cindex property, special, BLOCKED
 @c guessing that ITEM is needed in this area; also, should this list be sorted?
 @cindex property, special, ITEM
 @example
@@ -4461,6 +4490,7 @@ TIMESTAMP    @r{The first keyword-less timestamp in the entry.}
 TIMESTAMP_IA @r{The first inactive timestamp in the entry.}
 CLOCKSUM     @r{The sum of CLOCK intervals in the subtree.  @code{org-clock-sum}}
              @r{must be run first to compute the values.}
+BLOCKED      @r{"t" if task is currently blocked by children or siblings}
 ITEM         @r{The content of the entry.}
 @end example
 
@@ -4884,7 +4914,7 @@ is used in a much wider sense.
 A timestamp is a specification of a date (possibly with a time or a range of
 times) in a special format, either @samp{<2003-09-16 Tue>} or
 @samp{<2003-09-16 Tue 09:39>} or @samp{<2003-09-16 Tue
-12:00-12:30>}@footnote{This is inspired by the standard ISO 6801 date/time
+12:00-12:30>}@footnote{This is inspired by the standard ISO 8601 date/time
 format.  To use an alternative format, see @ref{Custom time format}.}.  A
 timestamp can appear anywhere in the headline or body of an Org tree entry.
 Its presence causes entries to be shown on specific dates in the agenda
@@ -6211,6 +6241,7 @@ process, you can use the following special command:
 @vindex org-refile-use-outline-path
 @vindex org-outline-path-complete-in-steps
 @vindex org-refile-allow-creating-parent-nodes
+@vindex org-log-refile
 Refile the entry or region at point.  This command offers possible locations
 for refiling the entry and lets you select one with completion.  The item (or
 all items in the region) is filed below the target heading as a subitem.
@@ -6224,6 +6255,10 @@ the variables @code{org-refile-use-outline-path} and
 @code{org-outline-path-complete-in-steps}.  If you would like to be able to
 create new nodes as new parents for refiling on the fly, check the
 variable @code{org-refile-allow-creating-parent-nodes}.
+When the variable @code{org-log-refile}@footnote{with corresponding
+@code{#+STARTUP} keywords @code{logrefile}, @code{lognoterefile},
+and @code{nologrefile}} is set, a time stamp or a note will be
+recorded when an entry has been refiled.
 @kindex C-u C-c C-w
 @item C-u C-c C-w
 Use the refile interface to jump to a heading.
@@ -7568,8 +7603,9 @@ key for this.
 @itemx S-@key{down}
 Decrease the priority of the current item.
 @c
+@kindex C-c C-z
 @kindex z
-@item z
+@item z @ @r{or also} @ C-c C-z
 @vindex org-log-into-drawer
 Add a note to the entry.  This note will be recorded, and then files to the
 same location where state change notes are put.  Depending on
@@ -10739,6 +10775,9 @@ configured using these options (see variables @code{org-log-done},
 @cindex @code{logredeadline}, STARTUP keyword
 @cindex @code{lognoteredeadline}, STARTUP keyword
 @cindex @code{nologredeadline}, STARTUP keyword
+@cindex @code{logrefile}, STARTUP keyword
+@cindex @code{lognoterefile}, STARTUP keyword
+@cindex @code{nologrefile}, STARTUP keyword
 @example
 logdone            @r{record a timestamp when an item is marked DONE}
 lognotedone        @r{record timestamp and a note when DONE}
@@ -10754,6 +10793,9 @@ nologreschedule    @r{do not record when a scheduling date changes}
 logredeadline      @r{record a timestamp when deadline changes}
 lognoteredeadline  @r{record a note when deadline changes}
 nologredeadline    @r{do not record when a deadline date changes}
+logrefile          @r{record a timestamp when refiling}
+lognoterefile      @r{record a note when refiling}
+nologrefile        @r{do not record when refiling}
 @end example
 @vindex org-hide-leading-stars
 @vindex org-odd-levels-only
@@ -11883,6 +11925,10 @@ Skip current entry if it has not been scheduled.
 Skip current entry if it has a deadline.
 @item '(org-agenda-skip-entry-if 'scheduled 'deadline)
 Skip current entry if it has a deadline, or if it is scheduled.
+@item '(org-agenda-skip-entry-if 'todo '("TODO" "WAITING"))
+Skip current entry if the TODO keyword is TODO or WAITING.
+@item '(org-agenda-skip-entry-if 'todo 'done)
+Skip current entry if the TODO keyword marks a DONE state.
 @item '(org-agenda-skip-entry-if 'timestamp)
 Skip current entry if it has any timestamp, may also be deadline or scheduled.
 @item '(org-agenda-skip-entry 'regexp "regular expression")
