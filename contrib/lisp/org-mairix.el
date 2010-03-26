@@ -263,7 +263,7 @@ know about that group' function. Volunteers?"
   :type 'hook)
 
 (defcustom org-mairix-gnus-groups
-  "^nn\\(?:folder\\|mbox\\|maildir\\|ml\\)+.*"
+  "^nn\\(?:folder\\|mbox\\|maildir\\|ml\\|mairix\\)+.*"
   "Define which groups are indexed with mairix. If the group doesn't
 match this regular expression an ordirary gnus: link will be created."
   :group 'org-mairix-gnus
