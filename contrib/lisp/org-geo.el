@@ -119,3 +119,5 @@ support links from OpenStreetMap and Google Maps."
     'dnd-protocol-alist)))
 
 (add-hook 'org-mode-hook 'org-geo-dnd-support)
+
+(provide 'org-geo)
