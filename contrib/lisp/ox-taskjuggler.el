@@ -501,7 +501,9 @@ resource.  Its id is derived from its name and made unique
 against UNIQUE-IDS.  If the (downcased) first token of the
 headline is not unique try to add more (downcased) tokens of the
 headline or finally add more underscore characters (\"_\")."
-  (let ((id (org-string-nw-p (org-element-property :TASK_ID item))))
+  (let ((id (org-string-nw-p (org-xor-value
+			      (org-element-property :RESOURCE_ID item)
+			      (org-element-property :TASK_ID item)))))
     ;; If an id is specified, use it, as long as it's unique.
     (if (and id (not (member id unique-ids))) id
       (let* ((parts (org-split-string (org-element-property :raw-value item)))
