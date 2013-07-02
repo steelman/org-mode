@@ -424,6 +424,15 @@ headlines and their associated ID."
           (cons resource id)))
       info)))
 
+(defun org-taskjuggler-assign-project-id (project info)
+  "Assign a unique ID to the PROJECT.  PROJECT is a single
+headline. INFO is a plist used as a communication channel.
+Return value is an alist between headlines and their associated
+ID.
+
+There is only one project provided by
+`org-taskjuggler-get-project', so there is no need to iterate."
+  (list (cons project (org-taskjuggler--build-unique-id project nil))))
 
 
 ;;; Accessors
@@ -502,8 +511,10 @@ against UNIQUE-IDS.  If the (downcased) first token of the
 headline is not unique try to add more (downcased) tokens of the
 headline or finally add more underscore characters (\"_\")."
   (let ((id (org-string-nw-p (org-xor-value
-			      (org-element-property :RESOURCE_ID item)
-			      (org-element-property :TASK_ID item)))))
+			      (org-xor-value
+			       (org-element-property :RESOURCE_ID item)
+			       (org-element-property :TASK_ID item))
+			      (org-element-property :PROJECT_ID item)))))
     ;; If an id is specified, use it, as long as it's unique.
     (if (and id (not (member id unique-ids))) id
       (let* ((parts (org-split-string (org-element-property :raw-value item)))
@@ -619,6 +630,10 @@ Return complete project plan as a string in TaskJuggler syntax."
   (let* ((tree (plist-get info :parse-tree))
          (project (or (org-taskjuggler-get-project info)
                       (error "No project specified"))))
+    (setq info
+	  (plist-put info :taskjuggler-unique-ids
+		     (org-taskjuggler-assign-project-id
+		      project info)))
     (concat
      ;; 1. Insert header.
      (org-element-normalize-string org-taskjuggler-default-global-header)
@@ -644,8 +659,10 @@ Return complete project plan as a string in TaskJuggler syntax."
        ;; `:taskjuggler-unique-ids' property in INFO.
        (setq info
              (plist-put info :taskjuggler-unique-ids
-                        (org-taskjuggler-assign-resource-ids
-                         main-resources info)))
+			(append
+			 (org-taskjuggler-assign-resource-ids
+			  main-resources info)
+			 (plist-get info :taskjuggler-unique-ids))))
        (concat
         (if main-resources
             (mapconcat
