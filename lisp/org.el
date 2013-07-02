@@ -9810,6 +9810,10 @@ Note: this function also decodes single byte encodings like
   "Exclusive or."
   (if a (not b) b))
 
+(defun org-xor-value (a b)
+  "Exclusive or, returns a value of non-nil argument or nil."
+  (if (and a b) nil (or a b)))
+
 (defun org-fixup-message-id-for-http (s)
   "Replace special characters in a message id, so it can be used in an http query."
   (when (string-match "%" s)
