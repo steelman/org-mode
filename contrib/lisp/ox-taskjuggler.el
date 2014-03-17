@@ -752,7 +752,7 @@ days from now."
           (let ((end (org-taskjuggler-get-end project)))
             (or (and end (format "- %s" end))
                 (format "+%sd" org-taskjuggler-default-project-duration)))
-          (or org-taskjuggler-project-attributes "")))
+          (or org-taskjuggler-default-project-attributes "")))
 
 (defun org-taskjuggler--build-resource (resource info)
   "Return a resource declaration.
