@@ -211,6 +211,12 @@ marked with `org-taskjuggler-project-tag'"
   :group 'org-export-taskjuggler
   :type 'integer)
 
+(defcustom org-taskjuggler-default-project-attributes ""
+  "Default project attributes.
+See http://www.taskjuggler.org/tj3/manual/project.html"
+  :group 'org-export-taskjuggler
+  :type 'string)
+
 (defcustom org-taskjuggler-default-reports
   '("textreport report \"Plan\" {
   formats html
@@ -734,7 +740,7 @@ PROJECT is a headline.  INFO is a plist used as a communication
 channel.  If no start date is specified, start today.  If no end
 date is specified, end `org-taskjuggler-default-project-duration'
 days from now."
-  (format "project %s \"%s\" \"%s\" %s %s {\n}\n"
+  (format "project %s \"%s\" \"%s\" %s %s {\n%s\n}\n"
           (org-taskjuggler-get-id project info)
           (org-taskjuggler-get-name project)
           ;; Version is obtained through :TASKJUGGLER_VERSION:
@@ -745,7 +751,8 @@ days from now."
               (format-time-string "%Y-%m-%d"))
           (let ((end (org-taskjuggler-get-end project)))
             (or (and end (format "- %s" end))
-                (format "+%sd" org-taskjuggler-default-project-duration)))))
+                (format "+%sd" org-taskjuggler-default-project-duration)))
+          (or org-taskjuggler-project-attributes "")))
 
 (defun org-taskjuggler--build-resource (resource info)
   "Return a resource declaration.
