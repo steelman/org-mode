@@ -306,6 +306,17 @@ but before any resource and task declarations."
   :group 'org-export-taskjuggler
   :type '(string :tag "Preamble"))
 
+(defcustom org-taskjuggler-valid-project-attributes
+  '(alertlevels currency currencyformat dailyworkinghours extend
+		include journalentry now numberformat outputdir
+		scenario shorttimeformat timeformat timezone
+		timingresolution trackingscenario weekstartsmonday
+		weekstartssunday workinghours yearlyworkingdays)
+  "Valid attributes for Taskjuggler project. If one of these appears
+as a property for a headline, it will be exported with the
+corresponding project."
+  :group 'org-export-taskjuggler)
+
 (defcustom org-taskjuggler-valid-task-attributes
   '(account start note duration endbuffer endcredit end
 	    flags journalentry length limits maxend maxstart minend
@@ -740,7 +751,7 @@ PROJECT is a headline.  INFO is a plist used as a communication
 channel.  If no start date is specified, start today.  If no end
 date is specified, end `org-taskjuggler-default-project-duration'
 days from now."
-  (format "project %s \"%s\" \"%s\" %s %s {\n%s\n}\n"
+  (format "project %s \"%s\" \"%s\" %s %s {\n%s}\n"
           (org-taskjuggler-get-id project info)
           (org-taskjuggler-get-name project)
           ;; Version is obtained through :TASKJUGGLER_VERSION:
@@ -752,7 +763,9 @@ days from now."
           (let ((end (org-taskjuggler-get-end project)))
             (or (and end (format "- %s" end))
                 (format "+%sd" org-taskjuggler-default-project-duration)))
-          (or org-taskjuggler-default-project-attributes "")))
+          (or (org-taskjuggler--build-attributes
+	       project org-taskjuggler-valid-project-attributes)
+	      org-taskjuggler-default-project-attributes)))
 
 (defun org-taskjuggler--build-resource (resource info)
   "Return a resource declaration.
