@@ -160,7 +160,8 @@ which is replaced with the subtitle."
     ("fullframe"      "F")
     ("ignoreheading"  "i")
     ("note"           "n")
-    ("noteNH"         "N"))
+    ("noteNH"         "N")
+    ("noteT"          "T"))
   "Alist of environments treated in a special way by the back-end.
 Keys are environment names, as strings, values are bindings used
 in `org-beamer-select-environment'.  Environments listed here,
@@ -316,7 +317,7 @@ channel."
 ;; (`org-beamer--format-block').
 ;;
 ;; `org-beamer-headline' also takes care of special environments
-;; like "ignoreheading", "note", "noteNH", "appendix" and
+;; like "ignoreheading", "note", "noteNH", "noteT", "appendix" and
 ;; "againframe".
 
 (defun org-beamer--get-label (headline info)
@@ -585,6 +586,8 @@ used as a communication channel."
      (when column-width "\\end{column}\n")
      (when end-columns-p "\\end{columns}"))))
 
+(defvar org-beamer--title-note nil)
+
 (defun org-beamer-headline (headline contents info)
   "Transcode HEADLINE element into Beamer code.
 CONTENTS is the contents of the headline.  INFO is a plist used
@@ -643,14 +646,20 @@ as a communication channel."
 	(concat (make-string (org-element-property :pre-blank headline) ?\n)
 		contents))
        ;; Case 4: HEADLINE is a note.
-       ((member environment '("note" "noteNH"))
-	(format "\\note{%s}"
-		(concat (and (equal environment "note")
-			     (concat
-			      (org-export-data
-			       (org-element-property :title headline) info)
-			      "\n"))
-			(org-trim contents))))
+       ((member environment '("note" "noteNH" "noteT"))
+	(let ((overlay )
+	      (note
+	       (format "\\note{%s}"
+		       (concat (and (equal environment "note")
+				    (concat
+				     (org-export-data
+				      (org-element-property :title headline) info)
+				     "\n"))
+			       (org-trim contents)))))
+	  (if (member environment '("note" "noteNH"))
+	      note
+	    (setq org-beamer--title-note note)
+	    nil)))
        ;; Case 5: HEADLINE is a frame.
        ((= level frame-level)
 	(org-beamer--format-frame headline contents info))
@@ -859,6 +868,10 @@ holding export options."
 			   org-latex-title-command)
 	     (format org-latex-title-command title))
 	    (t org-latex-title-command)))
+     ;; Title notes
+     (org-element-normalize-string
+      (when (stringp org-beamer--title-note)
+	org-beamer--title-note))
      ;; Table of contents.
      (let ((depth (plist-get info :with-toc)))
        (when depth
