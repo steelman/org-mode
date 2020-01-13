@@ -649,7 +649,8 @@ as a communication channel."
        ((member environment '("note" "noteNH" "noteT"))
 	(let ((overlay )
 	      (note
-	       (format "\\note{%s}"
+	       (format "\\note%s{%s}"
+		       (or (org-element-property :BEAMER_ENVARGS headline) "")
 		       (concat (and (equal environment "note")
 				    (concat
 				     (org-export-data
